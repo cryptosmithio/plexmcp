@@ -235,8 +235,14 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
             endpoint = f"http://{host}:{port}{path}"
             logger.info(f"Running in HTTP Streamable mode: {endpoint}")
 
-            # Inject CORS and Health for Antigravity discovery
-            app = mcp_app.http_app()
+            # Inject CORS and Health for Antigravity discovery.
+            #
+            # NOTE: we build and serve this app with uvicorn directly instead of
+            # calling mcp_app.run_http_async(...) — that method builds its own
+            # fresh Starlette app internally (via self.http_app(...)) and ignores
+            # any app object built beforehand, which silently dropped both the
+            # CORS middleware and the /health route added below.
+            app = mcp_app.http_app(path=path)
             from fastapi.middleware.cors import CORSMiddleware
 
             app.add_middleware(
@@ -256,11 +262,17 @@ async def run_server_async(mcp_app, args: argparse.Namespace | None = None, serv
                 allow_headers=["*"],
             )
 
-            @app.get("/health")
-            async def health():
-                return {"status": "ok", "server": server_name}
+            async def health(_request):
+                from starlette.responses import JSONResponse
 
-            await mcp_app.run_http_async(host=host, port=port, path=path)
+                return JSONResponse({"status": "ok", "server": server_name})
+
+            app.add_route("/health", health, methods=["GET"])
+
+            import uvicorn
+
+            uvicorn_config = uvicorn.Config(app, host=host, port=port, lifespan="on")
+            await uvicorn.Server(uvicorn_config).serve()
 
         elif transport == "sse":
             host = config["host"]

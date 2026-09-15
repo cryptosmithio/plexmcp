@@ -206,6 +206,70 @@ export async function updateSettings(body: {
 	return res.json();
 }
 
+export type DialogicResult<T = unknown> = {
+	success: boolean;
+	message: string;
+	data: T | null;
+};
+
+/** Test a Plex URL + token against the real server. Omit body to test the currently saved values. */
+export async function testPlexConnection(body?: {
+	plex_url?: string;
+	plex_token?: string;
+}): Promise<
+	DialogicResult<{ friendly_name: string; version: string; machine_identifier: string | null }>
+> {
+	const res = await fetch(`${getBaseUrl()}/api/system/plex/test`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body ?? {}),
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+/** Start the Plex PIN auth flow — returns a code and an app.plex.tv link to open. */
+export async function createPlexPin(): Promise<
+	DialogicResult<{ pin_id: number; code: string; client_id: string; auth_url: string }>
+> {
+	const res = await fetch(`${getBaseUrl()}/api/system/plex/pin`, { method: "POST" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+/** Poll a pending Plex PIN. Once the user approves it in the browser, the token is saved server-side. */
+export async function pollPlexPin(
+	pinId: number,
+	clientId: string,
+): Promise<DialogicResult<{ authorized: boolean; token_set?: boolean }>> {
+	const sp = new URLSearchParams({ client_id: clientId });
+	const res = await fetch(`${getBaseUrl()}/api/system/plex/pin/${pinId}?${sp}`);
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type DiagnosticStatus = "ok" | "warn" | "error" | "info";
+
+export type DiagnosticCheck = {
+	id: string;
+	label: string;
+	status: DiagnosticStatus;
+	message: string;
+};
+
+export type DiagnosticsResponse = {
+	success: boolean;
+	overall: DiagnosticStatus;
+	checks: DiagnosticCheck[];
+};
+
+/** Run every connectivity/config check at once (Plex, LLM, RAG, *arr). */
+export async function getDiagnostics(): Promise<DiagnosticsResponse> {
+	const res = await fetch(`${getBaseUrl()}/api/system/diagnostics`, { cache: "no-store" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
 export async function getLlmModels(params?: {
 	provider?: string;
 	base_url?: string;
@@ -215,6 +279,75 @@ export async function getLlmModels(params?: {
 	if (params?.base_url) sp.set("base_url", params.base_url);
 	const qs = sp.toString();
 	const res = await fetch(`${getBaseUrl()}/api/llm/models${qs ? `?${qs}` : ""}`);
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type LlmProviderInfo = {
+	id: string;
+	label: string;
+	kind: "local" | "cloud";
+	base_url: string;
+	needs_key: boolean;
+	key_env: string | null;
+	configured: boolean;
+};
+
+/** Local + cloud provider registry: which are configured, never key bytes. */
+export async function getLlmProviders(): Promise<{ providers: LlmProviderInfo[] }> {
+	const res = await fetch(`${getBaseUrl()}/api/llm/providers`, { cache: "no-store" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+/** Save a cloud provider's API key to the backend keystore (write-only). */
+export async function saveLlmProviderKey(
+	provider: string,
+	apiKey: string,
+): Promise<{ success: boolean; error?: string }> {
+	const res = await fetch(`${getBaseUrl()}/api/llm/keys/${encodeURIComponent(provider)}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ api_key: apiKey }),
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type GpuInfo = {
+	index: number;
+	name: string;
+	total_mb: number;
+	used_mb: number;
+	free_mb: number;
+};
+
+/** Live GPU VRAM telemetry ([] on a GPU-less machine - not an error). */
+export async function getLlmGpus(): Promise<{ gpus: GpuInfo[] }> {
+	const res = await fetch(`${getBaseUrl()}/api/llm/gpus`, { cache: "no-store" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type LoadedModel = { name: string; size_vram_mb: number; expires_at: string };
+
+/** Models currently resident on the local Ollama engine. */
+export async function getLlmLoaded(): Promise<{ engine: boolean; models: LoadedModel[] }> {
+	const res = await fetch(`${getBaseUrl()}/api/llm/loaded`, { cache: "no-store" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+/** Evict Ollama models from VRAM. Omit `keep` to evict everything - the
+ * escape hatch when VRAM is full and an AI task needs room to run. */
+export async function unloadLlm(
+	keep?: string,
+): Promise<{ success: boolean; evicted: string[]; engine: boolean }> {
+	const res = await fetch(`${getBaseUrl()}/api/llm/unload`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ keep: keep ?? "" }),
+	});
 	if (!res.ok) throw new Error(await res.text());
 	return res.json();
 }
@@ -350,4 +483,206 @@ export async function syncRag(): Promise<{
 		indexed_count: 0,
 		error: "Reindex timed out while waiting for completion.",
 	};
+}
+
+// --- Deep media enrichment ---------------------------------------------------
+
+export type EnrichmentContentWarnings = {
+	violence?: string;
+	sexual_content?: string;
+	language?: string;
+	other_triggers?: string[];
+};
+
+export type EnrichmentReportSections = {
+	synopsis?: string;
+	critical_overview?: string;
+	why_this_matters?: string;
+	production_notes?: string;
+	reception_at_release?: string;
+	legacy?: string;
+	content_warnings?: EnrichmentContentWarnings;
+	thematic_tags?: string[];
+	director_context?: string;
+	key_cast_notes?: string;
+	awards?: string[];
+	trivia?: string[];
+};
+
+export type EnrichmentReport = {
+	id: number;
+	plex_rating_key: string;
+	media_type: string;
+	title: string;
+	year: number | null;
+	enrichment_version: number;
+	report_sections: EnrichmentReportSections;
+	sources_fetched: string[];
+	sources_failed: string[];
+	raw_data: Record<string, unknown>;
+	themes: string[];
+	director: string | null;
+	tmdb_collection_id: number | null;
+	fetched_at?: string;
+	updated_at?: string;
+	from_cache?: boolean;
+};
+
+export type EnrichOptions = {
+	force_refresh?: boolean;
+	sources?: string[];
+	llm_provider?: string;
+	llm_model?: string;
+};
+
+/** Fetch/synthesise the deep dossier for one library item (cached 90 days). */
+export async function enrichMedia(
+	ratingKey: string,
+	opts: EnrichOptions = {},
+): Promise<{ success: boolean } & EnrichmentReport> {
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/${encodeURIComponent(ratingKey)}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(opts),
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+/** Read a cached dossier without triggering a new fetch/synthesis. */
+export async function getEnrichment(
+	ratingKey: string,
+): Promise<{ success: boolean; data: EnrichmentReport | null; message?: string }> {
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/${encodeURIComponent(ratingKey)}`, {
+		cache: "no-store",
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type RelatedMediaItem = {
+	source_rating_key: string;
+	target_rating_key: string;
+	relation_type: string;
+	relation_detail: string | null;
+	confidence: number;
+	target_title?: string;
+	target_year?: number | null;
+};
+
+/** Library items related to this one (by director, shared cast, collection, or theme). */
+export async function getRelatedMedia(
+	ratingKey: string,
+	relationType?: string,
+): Promise<{ success: boolean; data: RelatedMediaItem[]; count: number }> {
+	const sp = new URLSearchParams();
+	if (relationType) sp.set("relation_type", relationType);
+	const qs = sp.toString();
+	const res = await fetch(
+		`${getBaseUrl()}/api/enrichment/${encodeURIComponent(ratingKey)}/related${qs ? `?${qs}` : ""}`,
+		{ cache: "no-store" },
+	);
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type BulkEnrichOptions = EnrichOptions & {
+	library_id?: string;
+	rating_keys?: string[];
+	max_items?: number;
+};
+
+/** Queue a background enrichment run over an entire library (or an explicit list of items). */
+export async function startBulkEnrichment(
+	opts: BulkEnrichOptions,
+): Promise<{ success: boolean; job_id: string; total: number }> {
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/bulk`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(opts),
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type BulkEnrichmentStatus = {
+	job_id: string;
+	phase: "running" | "complete" | "error";
+	total: number;
+	done: number;
+	failed: number;
+	current_title: string;
+	errors: { title: string; error: string }[];
+	message?: string;
+};
+
+export async function getBulkEnrichmentStatus(
+	jobId: string,
+): Promise<{ success: boolean } & BulkEnrichmentStatus> {
+	const res = await fetch(
+		`${getBaseUrl()}/api/enrichment/bulk/status/${encodeURIComponent(jobId)}`,
+		{
+			cache: "no-store",
+		},
+	);
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type EnrichmentThemeHit = { plex_rating_key: string; title: string; year: number | null };
+
+export async function searchByTheme(
+	theme: string,
+	limit = 50,
+): Promise<{ success: boolean; data: EnrichmentThemeHit[]; count: number }> {
+	const sp = new URLSearchParams({ theme, limit: String(limit) });
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/by-theme?${sp.toString()}`, {
+		cache: "no-store",
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export async function searchByPerson(
+	name: string,
+	role?: string,
+	limit = 50,
+): Promise<{ success: boolean; data: EnrichmentThemeHit[]; count: number }> {
+	const sp = new URLSearchParams({ name, limit: String(limit) });
+	if (role) sp.set("role", role);
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/by-person?${sp.toString()}`, {
+		cache: "no-store",
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type EnrichmentStats = {
+	success: boolean;
+	enriched_count: number;
+	active_job_id: string | null;
+};
+
+export async function getEnrichmentStats(): Promise<EnrichmentStats> {
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/status/stats`, { cache: "no-store" });
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
+}
+
+export type StaleEnrichment = {
+	plex_rating_key: string;
+	title: string;
+	year: number | null;
+	updated_at: string;
+};
+
+export async function getStaleEnrichments(
+	days = 90,
+): Promise<{ success: boolean; data: StaleEnrichment[]; count: number }> {
+	const sp = new URLSearchParams({ days: String(days) });
+	const res = await fetch(`${getBaseUrl()}/api/enrichment/status/stale?${sp.toString()}`, {
+		cache: "no-store",
+	});
+	if (!res.ok) throw new Error(await res.text());
+	return res.json();
 }

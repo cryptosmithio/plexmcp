@@ -15,7 +15,11 @@ As of v2.4.1 (April 2026), plex-mcp is a FastMCP 3.2 server with:
   performance, playlists, users, server health, reporting
 - Simultaneous stdio + HTTP transport
 - LanceDB semantic search (`plex_rag`) indexed against Plex metadata
-- Wikipedia enrichment (`plex_media_enrichment`)
+- **Deep metadata enrichment** (`plex_media_enrichment`, shipped 2026-09-13):
+  Wikipedia + TMDB (deep) + JustWatch, LLM-synthesised critical dossier per
+  item, library-wide cross-references (director/cast/collection/theme),
+  webapp `/media` detail page and `/enrichment` bulk-run + theme-search page.
+  See `DEEP_METADATA_ENRICHMENT.md`.
 - Sampling-based natural assistant (`plex_natural_assistant`)
 - Webapp on ports 10741/10742 with dashboard, library browsing,
   search, chat
@@ -60,7 +64,7 @@ Each project has its own spec in `docs/plans/`. Each is independent.
 
 | # | Project                         | Spec                                  | Effort | Daily-use impact |
 |---|---------------------------------|---------------------------------------|--------|------------------|
-| 1 | Deep metadata enrichment        | `DEEP_METADATA_ENRICHMENT.md`         | 3–4 d  | High             |
+| 1 | ~~Deep metadata enrichment~~ **Shipped 2026-09-13** | `DEEP_METADATA_ENRICHMENT.md`         | 3–4 d  | High             |
 | 2 | Subtitle RAG                    | `SUBTITLE_RAG.md`                     | 4–5 d  | Very high        |
 | 3 | Taste modelling                 | `TASTE_MODELLING.md`                  | 2–3 d  | High             |
 | 4 | Mood-based nightly picker       | `MOOD_PICKER.md`                      | 1–2 d  | High             |

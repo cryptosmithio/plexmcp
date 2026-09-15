@@ -1,6 +1,6 @@
 # Tauri 2.0 Native Desktop App
 
-> **End users:** download `Plex MCP_*_x64-setup.exe` from [Releases](https://github.com/sandraschi/plex-mcp/releases/latest) and double-click. This page is for **maintainers** building the installer.
+> **End users:** download `Plex MCP_*_x64-setup.exe` from [Releases](https://github.com/sandraschi/plexmcp/releases/latest) and double-click. This page is for **maintainers** building the installer.
 
 Plex MCP ships with a Tauri 2.0 native wrapper — **one** installer, **one** shortcut. Python backend embedded in the bundle (not `externalBin`).
 

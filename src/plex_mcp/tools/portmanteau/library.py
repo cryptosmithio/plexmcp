@@ -110,7 +110,7 @@ async def plex_library(
             return ToolResult(
                 content=summarize_items(libraries, "library"),
                 structured_content=build_library_grid(libraries),
-                meta={"prefabs": ["plex_library_grid"]},
+                meta={"prefabs": ["plex_library_grid"], "data": libraries},
             )
 
         # Operation: get
@@ -479,6 +479,7 @@ async def plex_library(
 
             return ToolResult(
                 content=summarize_items(data, "item"),
+                meta={"data": data},
             )
 
         return ToolResult(

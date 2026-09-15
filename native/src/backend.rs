@@ -1,5 +1,5 @@
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -98,21 +98,82 @@ pub fn materialize_backend(app: &AppHandle) -> Result<PathBuf, String> {
         app,
         &format!("using bundled backend: {}", bundled.display()),
     );
-    Ok(bundled)
+    // Strip Windows extended-length prefix
+    let s = bundled.to_string_lossy().to_string();
+    let clean = s.strip_prefix("\\\\?\\").map(PathBuf::from).unwrap_or(bundled.clone());
+    Ok(clean)
 }
 
+fn port_is_free(port: u16) -> bool {
+    TcpStream::connect_timeout(
+        &SocketAddr::from_str(&format!("127.0.0.1:{port}")).unwrap(),
+        Duration::from_millis(200),
+    )
+    .is_err()
+}
+
+/// Multi-layer port reclaim: Stop-Process, then taskkill, then a UAC-elevated
+/// taskkill if a listener survives both (e.g. a service or elevated process
+/// from a prior run), polling for the port to actually free between each
+/// layer instead of assuming a single kill call worked.
 fn free_port(port: u16) {
     #[cfg(windows)]
     {
-        let script = format!(
-            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ taskkill /F /PID $_.OwningProcess /T 2>$null }}"
+        if port_is_free(port) {
+            return;
+        }
+
+        let stop_script = format!(
+            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {{ Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }}"
         );
         let _ = Command::new("powershell.exe")
-            .args(["-NoProfile", "-Command", &script])
+            .args(["-NoProfile", "-Command", &stop_script])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
-        thread::sleep(Duration::from_millis(300));
+
+        for _ in 0..10 {
+            if port_is_free(port) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(300));
+        }
+
+        let taskkill_script = format!(
+            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ taskkill /F /PID $_.OwningProcess /T 2>$null }}"
+        );
+        let _ = Command::new("powershell.exe")
+            .args(["-NoProfile", "-Command", &taskkill_script])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+
+        for _ in 0..10 {
+            if port_is_free(port) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(300));
+        }
+
+        // Last resort: elevated taskkill for processes this session can't touch
+        // (e.g. started under a different session/service context).
+        let elevated_script = format!(
+            "Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList '-NoProfile -Command \"Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ taskkill /F /PID $_.OwningProcess /T }}\"'"
+        );
+        let _ = Command::new("powershell.exe")
+            .args(["-NoProfile", "-Command", &elevated_script])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+
+        // Poll up to ~240s total for the elevated prompt (if any) to be
+        // approved and the port to actually free.
+        for _ in 0..800 {
+            if port_is_free(port) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(300));
+        }
     }
 }
 
@@ -149,8 +210,8 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         .env("PORT", BACKEND_PORT.to_string())
         .env("MCP_TRANSPORT", "http")
         .env("PLEX_TAURI", "1")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     #[cfg(windows)]
     {
@@ -159,9 +220,30 @@ pub fn spawn_backend(app: AppHandle, state: &BackendProcess) -> Result<String, S
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let child = command
+    let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to spawn {}: {e}", backend_path.display()))?;
+
+    // Backend stdout/stderr was previously discarded entirely — if the Python
+    // process crashed on startup (import error, port conflict on its own
+    // side), there was no way to see why beyond "not reachable". Pipe both
+    // into backend-spawn.log so a failed launch is actually diagnosable.
+    if let Some(stdout) = child.stdout.take() {
+        let app_out = app.clone();
+        thread::spawn(move || {
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                log_line(&app_out, &format!("[backend stdout] {line}"));
+            }
+        });
+    }
+    if let Some(stderr) = child.stderr.take() {
+        let app_err = app.clone();
+        thread::spawn(move || {
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                log_line(&app_err, &format!("[backend stderr] {line}"));
+            }
+        });
+    }
 
     state.0.lock().unwrap().replace(child);
 

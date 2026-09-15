@@ -5,17 +5,19 @@
     BackendPort  = 10740
     FrontendPort = 10741
     HealthPath   = '/health'
-    WebRoot      = 'D:\Dev\repos\plex-mcp\webapp'
+    WebRoot      = 'webapp\frontend'
     Backend = @{
-        Kind          = 'uvicorn'
+        Kind          = 'uvicorn-web-app'
         UvicornTarget = 'app.main:app'
+        WorkDir       = 'webapp\backend'
+        PythonPath    = 'webapp\backend;src'
         SyncExtras    = @('dev')
         Env           = @{ WEB_PORT = '10740' }
     }
     Frontend = @{
-        Kind           = 'vite-npm'
+        Kind           = 'next'
         PackageManager = 'npm'
-        PortEnvVar     = 'VITE_PORT'
-        ApiTargetEnv   = 'VITE_API_TARGET'
+        PortEnvVar     = 'PORT'
+        ApiTargetEnv   = 'API_URL'
     }
 }

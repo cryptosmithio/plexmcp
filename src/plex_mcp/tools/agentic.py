@@ -1,5 +1,5 @@
 """
-FastMCP 3.1 — SEP-1577 agentic tools for PlexMCP.
+FastMCP 3.1 - SEP-1577 agentic tools for PlexMCP.
 
 Uses Context.sample_step (tools) and Context.sample (single-turn text). Requires
 sampling support (local Ollama via PlexSamplingHandler or client-side sampling).
@@ -61,7 +61,7 @@ def register_agentic_plex_tools(app: Any) -> None:
         ],
         max_iterations: Annotated[int, Field(description="Maximum sample_step rounds (default 8).")] = 8,
         context: Annotated[
-            Context | None, Field(description="FastMCP Context — injected automatically when client supports sampling.")
+            Context | None, Field(description="FastMCP Context - injected automatically when client supports sampling.")
         ] = None,
     ) -> ToolResult:
         """
@@ -192,7 +192,7 @@ def register_agentic_plex_tools(app: Any) -> None:
     async def plex_natural_assistant(
         user_query: Annotated[str, Field(description="User question about Plex Media Server.")],
         context: Annotated[
-            Context | None, Field(description="FastMCP Context — injected automatically when client supports sampling.")
+            Context | None, Field(description="FastMCP Context - injected automatically when client supports sampling.")
         ] = None,
         detail_level: Annotated[str, Field(description="Response detail: brief, standard, or detailed.")] = "standard",
     ) -> ToolResult:

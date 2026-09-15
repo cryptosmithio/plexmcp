@@ -16,6 +16,32 @@ Server-side LLM for `plex_natural_assistant` / agentic flows when the host does 
 | `PLEX_SAMPLING_BASE_URL` | OpenAI-compatible API base (e.g. Ollama `http://127.0.0.1:11434/v1`) |
 | `PLEX_SAMPLING_USE_CLIENT_LLM` | Set to `1` to prefer the MCP client’s LLM when supported |
 
+## LLM providers (chat, agentic tool-calling)
+
+Set via **Settings → LLM** (recommended) or environment variables. Local engines (Ollama, LM Studio, vLLM) need no key, just a running instance. Cloud providers work on a GPU-less machine and need a key, saved per-provider to a 0600 keystore file (`webapp/backend/data/llm_keys.json`), never `settings.json`.
+
+| Variable | Provider |
+|----------|----------|
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `OPENROUTER_API_KEY` | OpenRouter |
+
+An env var always wins over the keystore. Settings also has a **GPU/VRAM panel** (Ollama residents + an "Evict all" button) so an AI task doesn't just fail when VRAM is already full — free it there, or switch to a cloud provider.
+
+## Deep media enrichment (optional)
+
+`plex_media_enrichment`'s `enrich`/`bulk_enrich` operations use:
+
+| Variable | Description |
+|----------|-------------|
+| `TMDB_API_KEY` | Official TMDB v3 API key. Without it, enrichment still runs on Wikipedia + JustWatch alone. Get one free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). |
+
+No key is needed for Wikipedia or JustWatch. LLM synthesis of the critical
+dossier (vs. raw sources) uses whichever provider/model is picked in the
+webapp's Enrichment/media pages — no separate env var, it reuses the LLM
+provider settings above. See [ENRICHMENT.md](ENRICHMENT.md).
+
 ## RAG / semantic search
 
 The `plex_rag` tool (LanceDB + embeddings) needs shared vector code importable as `docs_mcp.backend.rag_core` (e.g. clone [mcp-central-docs](https://github.com/sandraschi/mcp-central-docs) and add its `src` to `PYTHONPATH`). See [RAG.md](RAG.md).

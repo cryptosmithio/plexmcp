@@ -1,4 +1,4 @@
-"""Fleet MCP tool-call metrics — see mcp-central-docs/monitoring/templates/fleet_tool_metrics.py."""
+"""Fleet MCP tool-call metrics - see mcp-central-docs/monitoring/templates/fleet_tool_metrics.py."""
 
 from __future__ import annotations
 

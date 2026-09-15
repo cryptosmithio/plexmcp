@@ -126,11 +126,25 @@ function WebappSection() {
 					(if configured in Settings).
 				</li>
 				<li>
-					<strong>Libraries / Movies / Search</strong> — browse and search your media through the
-					API.
+					<strong>Libraries / Movies</strong> — browse your media through the API.
 				</li>
 				<li>
-					<strong>Semantic search</strong> — optional; requires RAG index and embeddings.
+					<strong>Search / RAG</strong> — keyword search, plus a RAG page for semantic search status
+					and reindexing (requires an index and embeddings).
+				</li>
+				<li>
+					<strong>Media Repair</strong> — probe and diagnose problem files via the backend&apos;s
+					repair tools.
+				</li>
+				<li>
+					<strong>Enrichment</strong> — bulk-run deep dossiers (Wikipedia + TMDB + JustWatch,
+					optionally LLM-synthesised) over a library, plus theme search. Each item&apos;s dossier
+					lives at its own <strong>media</strong> page (open via &quot;Full dossier&quot; on a
+					movie).
+				</li>
+				<li>
+					<strong>Tools</strong> — a raw view over the MCP tool surface, for debugging what the
+					agent side sees.
 				</li>
 				<li>
 					<strong>Chat</strong> — LLM chat with context; configure provider and base URL in backend
@@ -140,7 +154,16 @@ function WebappSection() {
 					<strong>Server</strong> — Plex server info (overview + raw JSON).
 				</li>
 				<li>
-					<strong>Settings</strong> — token and LLM-related settings where exposed.
+					<strong>Settings</strong> — Plex, LLM, and *arr configuration, including a{" "}
+					<strong>Test connection</strong> and <strong>Get a new token</strong> facility for Plex.
+				</li>
+				<li>
+					<strong>API Docs</strong> — links into the backend&apos;s Swagger UI / ReDoc / OpenAPI
+					JSON.
+				</li>
+				<li>
+					<strong>Health</strong> — the same status this page&apos;s connection check uses, as its
+					own page.
 				</li>
 			</ul>
 
@@ -163,7 +186,15 @@ function PlexSection() {
 				or Tailscale/VPN—your network rules apply).
 			</p>
 
-			<h3>Finding your token</h3>
+			<h3>Getting a token (recommended)</h3>
+			<p>
+				Go to <strong>Settings → Plex</strong> and click <strong>Get a new token</strong>. This
+				opens app.plex.tv for you to sign in and approve access, then saves the token automatically
+				— no copying tokens out of a browser session. Use <strong>Test connection</strong> on the
+				same page any time to check whether the current URL and token actually work.
+			</p>
+
+			<h3>Finding your token manually</h3>
 			<ol>
 				<li>Open Plex Web in your browser (signed in).</li>
 				<li>

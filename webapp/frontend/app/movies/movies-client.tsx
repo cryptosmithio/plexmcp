@@ -10,6 +10,7 @@ import {
 	ratingKeyFromItem,
 	safeMediaBlurb,
 } from "@/utils/plex-media-ui";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 
@@ -375,6 +376,14 @@ function MovieModal({
 									AI context
 								</button>
 							) : null}
+							{ratingKey && (
+								<Link
+									href={`/media?ratingKey=${encodeURIComponent(ratingKey)}`}
+									className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-amber/40 text-amber font-semibold hover:bg-amber/10 transition-colors"
+								>
+									Full dossier
+								</Link>
+							)}
 							{playErr && <span className="text-red-400 text-sm w-full">{playErr}</span>}
 							<button
 								type="button"

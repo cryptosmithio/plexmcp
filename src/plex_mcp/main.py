@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PlexMCP CLI entry — delegates to the shared FastMCP app in ``server`` (tools on ``mcp`` from ``app``).
+PlexMCP CLI entry - delegates to the shared FastMCP app in ``server`` (tools on ``mcp`` from ``app``).
 
 Do not construct a separate ``FastMCP`` here; that would start stdio with no registered tools.
 """

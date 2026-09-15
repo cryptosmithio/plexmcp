@@ -126,7 +126,7 @@ async def plex_media(
 
             return ToolResult(
                 content=summarize_items(data, "result"),
-                meta={"prefabs": ["plex_media_browser"]},
+                meta={"prefabs": ["plex_media_browser"], "data": data},
                 structured_content=build_media_browser(data),
             )
 
@@ -162,7 +162,7 @@ async def plex_media(
 
             return ToolResult(
                 content=summarize_items(data, "result"),
-                meta={"prefabs": ["plex_media_browser"]},
+                meta={"prefabs": ["plex_media_browser"], "data": data},
                 structured_content=build_media_browser(data),
             )
 
@@ -197,7 +197,7 @@ async def plex_media(
 
             return ToolResult(
                 content=summarize_items(data, "result"),
-                meta={"prefabs": ["plex_media_browser"]},
+                meta={"prefabs": ["plex_media_browser"], "data": data},
                 structured_content=build_media_browser(data),
             )
 

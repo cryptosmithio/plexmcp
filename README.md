@@ -12,10 +12,12 @@
 
 **Talk to your library.** An open [Model Context Protocol](https://modelcontextprotocol.io/) server for [Plex Media Server](https://www.plex.tv/) — plus an optional glass-style web app for browsing, search, and chat.
 
+[![CI](https://github.com/sandraschi/plexmcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sandraschi/plexmcp/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-0c4a6e?style=flat-square)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/FastMCP-3.2-6366f1?style=flat-square)](https://github.com/jlowin/fastmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Latest release](https://img.shields.io/github/v/release/sandraschi/plexmcp?style=flat-square&color=22c55e)](https://github.com/sandraschi/plexmcp/releases/latest)
 
 [Quick start](docs/QUICKSTART.md) · [Install](docs/INSTALL.md) · [Web app](docs/WEBAPP.md) · [All docs](docs/README.md) · [Changelog](CHANGELOG.md)
 
@@ -25,12 +27,12 @@
 
 ## Quick Start
 
-Download **`Plex MCP_*_x64-setup.exe`** from [Releases](https://github.com/sandraschi/plex-mcp/releases/latest) → double-click → launch **Plex MCP**. [Install guide](docs/INSTALL.md).
+Download **`Plex MCP_*_x64-setup.exe`** from [Releases](https://github.com/sandraschi/plexmcp/releases/latest) → double-click → launch **Plex MCP**. [Install guide](docs/INSTALL.md).
 
 Developers from source:
 
 ```powershell
-git clone https://github.com/sandraschi/plex-mcp
+git clone https://github.com/sandraschi/plexmcp plex-mcp
 cd plex-mcp
 just install
 just webapp
@@ -53,7 +55,7 @@ just webapp
 | [**docs/TOOLS.md**](docs/TOOLS.md) | Tool surface (portmanteaus and what they do) |
 | [**docs/WEBAPP.md**](docs/WEBAPP.md) | Web app ports, startup, feature pointers |
 | [**docs/RAG.md**](docs/RAG.md) | Semantic search and indexing |
-| [**docs/ENRICHMENT.md**](docs/ENRICHMENT.md) | Wikipedia-style enrichment |
+| [**docs/ENRICHMENT.md**](docs/ENRICHMENT.md) | Deep per-item enrichment: Wikipedia + TMDB + JustWatch, LLM dossiers, cross-references |
 | [**docs/TROUBLESHOOTING.md**](docs/TROUBLESHOOTING.md) | Auth, connection, RAG, common errors |
 | [**docs/DEVELOPMENT.md**](docs/DEVELOPMENT.md) | Tests, lint, layout for contributors |
 | [**docs/PRD.md**](docs/PRD.md) | Product scope and constraints |
@@ -62,9 +64,19 @@ just webapp
 
 ---
 
-## Stack (at a glance)
+## Stack
 
-Python **3.12+** · **FastMCP** 3.2 · **plexapi** · optional **LanceDB** RAG (see [docs/RAG.md](docs/RAG.md) for `PYTHONPATH` notes) · web app **FastAPI** + **Next.js**
+**MCP server:** Python 3.12+ · [FastMCP](https://github.com/jlowin/fastmcp) 3.4+ · [plexapi](https://github.com/pkkid/python-plexapi) · Pydantic 2
+
+**Webapp backend:** FastAPI · Uvicorn — calls the same Python package as the MCP server in-process, so behavior always matches
+
+**Webapp frontend:** Next.js 15 · React 18 · TypeScript · Tailwind CSS · lucide-react icons
+
+**Search:** LanceDB + fastembed for optional semantic/RAG search over your library metadata (see [docs/RAG.md](docs/RAG.md) for `PYTHONPATH` notes)
+
+**Desktop app:** Tauri 2 (Rust) — see [docs/TAURI.md](docs/TAURI.md)
+
+Not currently used: Zustand, Framer Motion (webapp state is local `useState`/`useEffect`; no client-side animation library beyond CSS transitions).
 
 ---
 

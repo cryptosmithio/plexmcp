@@ -1,6 +1,7 @@
 # MCPB Pack Exclusion List
 native/
 webapp/
+.claude/
 htmlcov/
 .pre-commit-cache/
 src/data/
@@ -24,3 +25,39 @@ Cargo.lock
 glama.json
 llms.txt
 llms-full.txt
+
+# Dev/CI tooling and reports irrelevant to a running MCP server
+.ruff_cache/
+.snapshots/
+.github/
+.opencode/
+_llm_test_scripts/
+docs-private/
+cua-reports/
+tmp/
+mcpb/
+coverage.xml
+uv.lock
+
+# Rust/Tauri/Zed sources (native desktop wrapper + Zed IDE extension, not part of the MCP server)
+src-tauri/
+zed-extension/
+
+# Legacy/unused code and build artifacts
+*.bak
+*.bak.*
+*.egg-info/
+justfile.*.bak
+justfile.bak-*
+
+# Dev-only scripts and root-level docs not needed at runtime
+verify_setup.py
+restart.bat
+stop.bat
+start.bat
+start.ps1
+WEBAPP_SETUP_GUIDE.md
+CLIENT_DISCOVERY_FIX.md
+FIXES_APPLIED.md
+BUILD_LOG.md
+reports/

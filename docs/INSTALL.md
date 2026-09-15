@@ -6,7 +6,7 @@ Fast path: [**QUICKSTART.md**](QUICKSTART.md). New to Plex or tokens: [**PLEX.md
 
 **Download, double-click, done.** No Git, no Python, no `just`, no build step.
 
-1. Go to [Releases](https://github.com/sandraschi/plex-mcp/releases/latest)
+1. Go to [Releases](https://github.com/sandraschi/plexmcp/releases/latest)
 2. Download **`Plex MCP_*_x64-setup.exe`**
 3. Double-click the installer → finish the wizard
 4. Set your [Plex token](PLEX.md) if prompted (or in Windows env / app config)
@@ -35,7 +35,7 @@ Python **3.12+** for source installs.
 
 ## Option B — MCPB drag and drop
 
-When published on [Releases](https://github.com/sandraschi/plex-mcp/releases/latest):
+When published on [Releases](https://github.com/sandraschi/plexmcp/releases/latest):
 
 1. Download `plex-mcp*.mcpb`
 2. Claude Desktop → Settings → MCP Servers → Install from file
@@ -47,7 +47,7 @@ Or build locally: `just build` (see [webapp/README.md](../webapp/README.md)).
 ## Option C — Fastest from source (webapp)
 
 ```powershell
-git clone https://github.com/sandraschi/plex-mcp
+git clone https://github.com/sandraschi/plexmcp plex-mcp
 cd plex-mcp
 copy .env.example .env
 # Edit .env — set PLEX_TOKEN, PLEX_URL
@@ -61,7 +61,7 @@ Or: `just webapp` — backend **10740**, frontend **10741**.
 ## Option D — MCP stdio only
 
 ```powershell
-git clone https://github.com/sandraschi/plex-mcp
+git clone https://github.com/sandraschi/plexmcp plex-mcp
 cd plex-mcp
 uv sync
 $env:PLEX_TOKEN = "your-token"
@@ -93,7 +93,7 @@ Claude Desktop:
 
 ```powershell
 winget install Casey.Just
-git clone https://github.com/sandraschi/plex-mcp
+git clone https://github.com/sandraschi/plexmcp plex-mcp
 cd plex-mcp
 just install
 just webapp

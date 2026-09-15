@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 import sys
+import asyncio
 import time
 from pathlib import Path
 
@@ -115,7 +116,7 @@ async def webapp_launch(body: WebappLaunchRequest) -> WebappLaunchResponse:
         return WebappLaunchResponse(already_running=False, started=False, url=url, error=str(e))
     deadline = time.monotonic() + POLL_TIMEOUT
     while time.monotonic() < deadline:
-        time.sleep(POLL_INTERVAL)
+        await asyncio.sleep(POLL_INTERVAL)
         if _check_port_up(port):
             return WebappLaunchResponse(already_running=False, started=True, url=url)
     return WebappLaunchResponse(

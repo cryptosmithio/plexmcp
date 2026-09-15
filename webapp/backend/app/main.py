@@ -22,6 +22,7 @@ class SPAStaticFiles(StaticFiles):
 
 from .api import (
     arr_stack,
+    enrichment,
     fleet,
     help_api,
     images,
@@ -174,6 +175,7 @@ app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
 app.include_router(rag.router, prefix="/api/rag", tags=["rag"])
 app.include_router(arr_stack.router, prefix="/api/arr", tags=["arr"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
+app.include_router(enrichment.router, prefix="/api/enrichment", tags=["enrichment"])
 
 # Mount frontend SPA at /app/ for Tauri WebView navigation
 import os as _os
@@ -189,10 +191,10 @@ if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     ]
 _try_paths.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "..", "frontend", "out"))
 for _p in _try_paths:
-    if _p and _os.path.isdir(_p):
+    if _p and Path(_p).is_dir():
         _frontend_dist = _p
         break
-if _frontend_dist and _os.path.isdir(_frontend_dist):
+if _frontend_dist and Path(_frontend_dist).is_dir():
     _frontend_dist = _os.path.realpath(_frontend_dist)
     try:
         app.mount("/app", SPAStaticFiles(directory=_frontend_dist, html=True, follow_symlink=True), name="frontend")
@@ -220,13 +222,14 @@ _SERVER_START = _time.time()
 
 @app.get("/health")
 async def health():
+    plex_configured = bool(os.environ.get("PLEX_TOKEN") or settings.PLEX_TOKEN)
     return {
         "status": "ok",
         "server": "plex-mcp",
         "version": "2.4.1",
         "uptime_seconds": int(_time.time() - _SERVER_START),
         "tool_count": _count_plex_tools(),
-        "providers": {"plex": "connected"},
+        "providers": {"plex": "configured" if plex_configured else "not_configured"},
     }
 
 
@@ -236,8 +239,8 @@ def _count_plex_tools() -> int:
 
         if hasattr(_mcp, "_tools"):
             return len(_mcp._tools)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not count registered tools, using fallback: %s", e)
     return 22
 
 

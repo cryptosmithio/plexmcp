@@ -144,17 +144,34 @@ if (Test-Path $nsisDir) { Copy-Item "$nsisDir\*-setup.exe" "$distDir\" -Force }
 $strayExe = "$PSScriptRoot\target\release\${RepoName}-backend.exe"
 if (Test-Path $strayExe) { Remove-Item $strayExe -Force; Write-Host "  Cleaned stray: $strayExe" -ForegroundColor DarkGray }
 
-# Restore standalone .next cache (Tauri build left basePath:/app, breaks next start)
+# Restore standalone .next cache (Tauri build left basePath:/app, breaks next start).
+# Best-effort only: the installer above is already built and staged, so a failure
+# here must never look like the overall build failed. Runs with a local, relaxed
+# ErrorActionPreference because Node/npm routinely write benign warnings (e.g. a
+# stale Browserslist DB notice) to stderr, and with "Stop" (set at the top of this
+# script) PowerShell turns that stderr write into a terminating error on its own —
+# `2>&1 | Out-Null` does not suppress it, since the escalation happens before the
+# pipeline redirection applies to an external process's stderr stream.
 $frontendDir = Join-Path $Root "webapp\frontend"
 if (Test-Path "$frontendDir\next.config.js") {
-    Write-Host "-> [5/5] Restoring standalone Next.js build..." -ForegroundColor Yellow
-    Push-Location $frontendDir
-    Remove-Item ".next" -Recurse -Force -ErrorAction SilentlyContinue
-    npm run build 2>&1 | Out-Null
-    if ((Test-Path ".next/static") -and -not (Test-Path ".next/standalone/.next/static")) {
-        Copy-Item ".next/static" ".next/standalone/.next/static" -Recurse -Force
+    Write-Host "-> [5/5] Restoring standalone Next.js build (best-effort)..." -ForegroundColor Yellow
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        Push-Location $frontendDir
+        Remove-Item ".next" -Recurse -Force -ErrorAction SilentlyContinue
+        npm run build 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  WARNING: standalone Next.js rebuild failed (exit $LASTEXITCODE) - the installer is unaffected; 'npm run dev' may need a manual 'npm run build' to recover." -ForegroundColor DarkYellow
+        } elseif ((Test-Path ".next/static") -and -not (Test-Path ".next/standalone/.next/static")) {
+            Copy-Item ".next/static" ".next/standalone/.next/static" -Recurse -Force
+        }
+    } catch {
+        Write-Host "  WARNING: standalone Next.js rebuild step threw ($_) - the installer is unaffected." -ForegroundColor DarkYellow
+    } finally {
+        Pop-Location
+        $ErrorActionPreference = $previousEap
     }
-    Pop-Location
 }
 
 Write-Host "=== Build complete ===" -ForegroundColor Green

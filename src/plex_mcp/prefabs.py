@@ -1,5 +1,5 @@
 """
-Prefab card builders for PlexMCP — FastMCP 3.2 interactive visual cards.
+Prefab card builders for PlexMCP - FastMCP 3.2 interactive visual cards.
 
 Each builder takes structured data and returns a ``PrefabApp`` suitable for
 ``structured_content`` on a ``ToolResult``.

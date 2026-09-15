@@ -61,7 +61,7 @@ if not _is_stdio_mode:
             if hasattr(mcp, "_tools"):
                 return len(mcp._tools)
         except Exception:
-            pass
+            logger.debug("Could not count registered tools", exc_info=True)
         return 0
 
     async def health(request):
@@ -186,8 +186,8 @@ def main():
             _proxy = create_proxy(_probe_url, name="Plex MCP")
             _proxy.run(transport="stdio")
             return
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("No HTTP daemon found at %s (%s) -- starting a fresh instance", _probe_url, e)
 
     from .transport import run_server
 

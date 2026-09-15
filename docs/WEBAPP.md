@@ -35,6 +35,16 @@ Real pixels may differ as the UI evolves. These **SVG** previews document the ma
 
 Replace with PNGs if you need marketing shots — see [assets/README.md](assets/README.md).
 
+## Diagnostics
+
+**Settings → Diagnostics** runs every connectivity check at once — Plex, LLM provider, RAG index, *arr stack — as a single traffic-light list, instead of hunting through separate pages to find which one is actually broken. Re-check on demand.
+
 ## *arr integration
 
 Optional Radarr/Sonarr/Lidarr URLs and API keys in **Settings** power the Overview *arr card and the `arr_stack` MCP tool (read-only status + queue counts). Typical setups use Docker media stacks; use the base URL reachable from the backend.
+
+## Deep enrichment
+
+- **`/media?ratingKey=...`** — a book-like dossier for one library item: synopsis, critical overview, "why this matters," content warnings, thematic tags (clickable), and "Related in your library" (by director, shared cast, collection, or theme). Opened via "Full dossier" on a movie's detail modal. "Enrich now" fetches Wikipedia + TMDB (deep) + JustWatch and, if an LLM provider/model is picked, synthesises the dossier; without one, it shows the raw sources instead.
+- **`/enrichment`** — enriched-item count, stale (>90 day) count, a bulk-enrichment launcher (library + max items + optional LLM provider/model) with live progress, and theme search. Bulk runs as a background job; one at a time.
+- Sources: Wikipedia + TMDB (deep) + JustWatch only — see `docs/plans/DEEP_METADATA_ENRICHMENT.md` for why Letterboxd/IMDB/Rotten Tomatoes/Metacritic scraping was deliberately left out.

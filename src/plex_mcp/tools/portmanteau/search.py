@@ -148,15 +148,18 @@ async def plex_search(
                                     limit=500,
                                 )
                                 all_items.extend(result.get("items", []))
-                            except Exception:
-                                continue  # Skip libraries that fail
+                            except Exception as e:
+                                logger.debug("Skipping library %s (fetch failed): %s", lib.get("id"), e)
+                                continue
 
                 # Filter by summary - items are dicts from get_library_items
                 results = [
                     item for item in all_items if item.get("summary") and search_term in item.get("summary", "").lower()
                 ][:limit]
             else:
-                results = await plex.search_media(query=query, limit=limit, library_id=library_id)
+                results = await plex.search_media(
+                    query=query, limit=limit, library_id=library_id, media_type=media_type
+                )
 
                 # Filter by summary if specified
                 if summary_contains and isinstance(results, list):
@@ -170,7 +173,7 @@ async def plex_search(
             return ToolResult(
                 content=summarize_items(data, "result"),
                 structured_content=build_media_browser(data),
-                meta={"prefabs": ["plex_media_browser"]},
+                meta={"prefabs": ["plex_media_browser"], "data": data},
             )
 
         if operation == "advanced_search":
@@ -231,7 +234,7 @@ async def plex_search(
             return ToolResult(
                 content=summarize_items(data, "result"),
                 structured_content=build_media_browser(data),
-                meta={"prefabs": ["plex_media_browser"]},
+                meta={"prefabs": ["plex_media_browser"], "data": data},
             )
 
         if operation == "suggest":

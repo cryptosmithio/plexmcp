@@ -100,15 +100,16 @@ build-sidecar:
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File '{{justfile_directory()}}\native\build-sidecar.ps1'
 
 # Primary end-user deliverable: Next static export + embedded backend + NSIS
+# NOTE: each recipe line runs in its own shell (just default), so a separate
+# `Set-Location` line here does NOT carry over to the next line — it silently
+# ran the UNRELATED root-level build.ps1 (a Zed extension build) instead of
+# native/build.ps1, reporting success the whole time. Single absolute-path
+# invocation avoids the footgun entirely, matching build-sidecar below.
 build-native install-desktop:
-    Set-Location '{{justfile_directory()}}\native'
-    $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-    .\build.ps1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File '{{justfile_directory()}}\native\build.ps1'
 
 build-native-debug:
-    Set-Location '{{justfile_directory()}}\native'
-    $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-    npx @tauri-apps/cli build --debug
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Location '{{justfile_directory()}}\native'; npx '@tauri-apps/cli' build --debug"
 
 # --- RAG  LanceDB metadata sync ---
 

@@ -1,15 +1,31 @@
 "use client";
 
 import { ReindexProgressPanel } from "@/components/rag/reindex-progress";
+import { DiagnosticsPanel } from "@/components/settings/DiagnosticsPanel";
+import { VramPanel } from "@/components/settings/VramPanel";
 import {
+	createPlexPin,
 	getLlmModels,
+	getLlmProviders,
 	getRagSyncStatus,
 	getSettings,
+	pollPlexPin,
+	saveLlmProviderKey,
 	startRagSync,
+	testPlexConnection,
 	updateSettings,
 } from "@/utils/api";
-import type { RagSyncProgress } from "@/utils/api";
+import type { LlmProviderInfo, RagSyncProgress } from "@/utils/api";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+const PIN_POLL_MS = 2000;
+const PIN_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Providers whose API key is saved per-provider to the backend keystore
+ * (POST /api/llm/keys/{provider}) rather than the legacy flat llm_api_key
+ * field. Ollama/LM Studio need no key; OpenAI keeps the legacy flat field
+ * for backward compatibility with existing setups. */
+const KEYSTORE_CLOUD_PROVIDERS = ["anthropic", "deepseek", "openrouter"];
 
 const DEFAULT_MOVIES_LIBRARY_KEY = "plex-webapp-default-movies-library";
 const DEFAULT_LLM_MODEL_KEY = "plex-webapp-default-llm-model";
@@ -55,6 +71,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 	const [defaultMoviesLibrary, setDefaultMoviesLibrary] = useState("");
 	const [models, setModels] = useState<string[]>([]);
 	const [modelError, setModelError] = useState<string | null>(null);
+	const [llmProviders, setLlmProviders] = useState<LlmProviderInfo[]>([]);
 	const [saving, setSaving] = useState(false);
 	const [message, setMessage] = useState<{
 		type: "ok" | "err";
@@ -67,6 +84,18 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 	} | null>(null);
 	const [ragProgress, setRagProgress] = useState<RagSyncProgress | null>(null);
 	const ragPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const [plexTokenSet, setPlexTokenSet] = useState(settings.plex_token_set ?? false);
+	const [plexTesting, setPlexTesting] = useState(false);
+	const [plexTestResult, setPlexTestResult] = useState<{
+		type: "ok" | "err";
+		text: string;
+	} | null>(null);
+	const [plexPinFlow, setPlexPinFlow] = useState<{
+		status: "idle" | "waiting" | "success" | "error";
+		message?: string;
+	}>({ status: "idle" });
+	const plexPinPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const plexPinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const stopRagPoll = useCallback(() => {
 		if (ragPollRef.current != null) {
@@ -74,6 +103,41 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 			ragPollRef.current = null;
 		}
 	}, []);
+
+	const stopPlexPinPoll = useCallback(() => {
+		if (plexPinPollRef.current != null) {
+			clearInterval(plexPinPollRef.current);
+			plexPinPollRef.current = null;
+		}
+		if (plexPinTimeoutRef.current != null) {
+			clearTimeout(plexPinTimeoutRef.current);
+			plexPinTimeoutRef.current = null;
+		}
+	}, []);
+
+	const handleProviderChange = (nextProvider: string) => {
+		setLlmProvider(nextProvider);
+		setLlmApiKey("");
+		// A stale local base_url would otherwise leak into a cloud provider's
+		// model/chat requests and get misread by the legacy host-sniffing
+		// fallback instead of engaging the provider registry.
+		if (nextProvider === "openai" || KEYSTORE_CLOUD_PROVIDERS.includes(nextProvider)) {
+			setLlmBaseUrl("");
+		}
+	};
+
+	const loadProviders = useCallback(async () => {
+		try {
+			const d = await getLlmProviders();
+			setLlmProviders(d.providers);
+		} catch {
+			setLlmProviders([]);
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadProviders();
+	}, [loadProviders]);
 
 	// Elicit models from the LLM endpoint
 	const loadModels = useCallback(async (provider: string, baseUrl: string) => {
@@ -113,6 +177,83 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 	useEffect(() => {
 		return () => stopRagPoll();
 	}, [stopRagPoll]);
+
+	useEffect(() => {
+		return () => stopPlexPinPoll();
+	}, [stopPlexPinPoll]);
+
+	const handleTestPlexConnection = async () => {
+		setPlexTesting(true);
+		setPlexTestResult(null);
+		try {
+			const result = await testPlexConnection({
+				plex_url: plexUrl.trim() || undefined,
+				plex_token: plexToken.trim() || undefined,
+			});
+			setPlexTestResult({ type: result.success ? "ok" : "err", text: result.message });
+		} catch (e) {
+			setPlexTestResult({
+				type: "err",
+				text: e instanceof Error ? e.message : "Test failed",
+			});
+		} finally {
+			setPlexTesting(false);
+		}
+	};
+
+	const handleGetNewPlexToken = async () => {
+		stopPlexPinPoll();
+		setPlexTestResult(null);
+		setPlexPinFlow({ status: "waiting", message: "Requesting a code from plex.tv..." });
+		try {
+			const pin = await createPlexPin();
+			if (!pin.success || !pin.data) {
+				setPlexPinFlow({ status: "error", message: pin.message });
+				return;
+			}
+			const { pin_id, client_id, auth_url } = pin.data;
+			window.open(auth_url, "_blank", "noopener,noreferrer");
+			setPlexPinFlow({
+				status: "waiting",
+				message: "Sign in and approve access in the tab that just opened...",
+			});
+
+			plexPinPollRef.current = setInterval(async () => {
+				try {
+					const poll = await pollPlexPin(pin_id, client_id);
+					if (poll.success && poll.data?.authorized) {
+						stopPlexPinPoll();
+						setPlexPinFlow({ status: "success", message: "New token saved." });
+						setPlexTokenSet(true);
+						setPlexToken("");
+					} else if (!poll.success) {
+						stopPlexPinPoll();
+						setPlexPinFlow({ status: "error", message: poll.message });
+					}
+				} catch (e) {
+					stopPlexPinPoll();
+					setPlexPinFlow({
+						status: "error",
+						message: e instanceof Error ? e.message : "Could not check authorization status",
+					});
+				}
+			}, PIN_POLL_MS);
+
+			plexPinTimeoutRef.current = setTimeout(() => {
+				stopPlexPinPoll();
+				setPlexPinFlow((prev) =>
+					prev.status === "waiting"
+						? { status: "error", message: "Timed out waiting for authorization. Try again." }
+						: prev,
+				);
+			}, PIN_TIMEOUT_MS);
+		} catch (e) {
+			setPlexPinFlow({
+				status: "error",
+				message: e instanceof Error ? e.message : "Could not start Plex sign-in",
+			});
+		}
+	};
 
 	const handleRagReindex = async () => {
 		setRagReindexing(true);
@@ -181,7 +322,14 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 			if (plexUrl.trim()) body.plex_url = plexUrl.trim();
 			if (llmProvider) body.llm_provider = llmProvider;
 			if (llmBaseUrl.trim()) body.llm_base_url = llmBaseUrl.trim();
-			if (llmApiKey.trim()) body.llm_api_key = llmApiKey.trim();
+			// Cloud providers beyond OpenAI save to the per-provider keystore
+			// (POST /api/llm/keys/{provider}) instead of the legacy flat
+			// llm_api_key field, so multiple cloud keys can coexist.
+			if (llmApiKey.trim() && KEYSTORE_CLOUD_PROVIDERS.includes(llmProvider)) {
+				await saveLlmProviderKey(llmProvider, llmApiKey.trim());
+			} else if (llmApiKey.trim()) {
+				body.llm_api_key = llmApiKey.trim();
+			}
 			if (radarrUrl.trim()) body.radarr_url = radarrUrl.trim();
 			if (radarrApiKey.trim()) body.radarr_api_key = radarrApiKey.trim();
 			if (sonarrUrl.trim()) body.sonarr_url = sonarrUrl.trim();
@@ -198,8 +346,14 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 				else localStorage.removeItem(DEFAULT_LLM_MODEL_KEY);
 			}
 			setMessage({ type: "ok", text: "Settings saved." });
-			if (plexToken.trim()) setPlexToken("");
-			if (llmApiKey.trim()) setLlmApiKey("");
+			if (plexToken.trim()) {
+				setPlexToken("");
+				setPlexTokenSet(true);
+			}
+			if (llmApiKey.trim()) {
+				setLlmApiKey("");
+				void loadProviders();
+			}
 			if (radarrApiKey.trim()) setRadarrApiKey("");
 			if (sonarrApiKey.trim()) setSonarrApiKey("");
 			if (lidarrApiKey.trim()) setLidarrApiKey("");
@@ -216,6 +370,8 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 
 	return (
 		<div className="space-y-8">
+			<DiagnosticsPanel />
+
 			<section className="rounded-xl glass-panel border border-slate-600/50 p-6">
 				<h2 className="text-lg font-semibold text-amber mb-4">Plex</h2>
 				<div className="space-y-4">
@@ -225,9 +381,7 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 							type="password"
 							value={plexToken}
 							onChange={(e) => setPlexToken(e.target.value)}
-							placeholder={
-								settings.plex_token_set ? "Leave blank to keep current" : "Your Plex token"
-							}
+							placeholder={plexTokenSet ? "Leave blank to keep current" : "Your Plex token"}
 							className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 placeholder-slate-500 text-sm"
 						/>
 					</div>
@@ -241,6 +395,51 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 							className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 placeholder-slate-500 text-sm"
 						/>
 					</div>
+					<div className="flex flex-wrap items-center gap-3">
+						<button
+							type="button"
+							onClick={handleTestPlexConnection}
+							disabled={plexTesting}
+							data-testid="plex-test-connection"
+							className="px-4 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm font-medium hover:bg-slate-600 disabled:opacity-50 border border-slate-600/50"
+						>
+							{plexTesting ? "Testing..." : "Test connection"}
+						</button>
+						<button
+							type="button"
+							onClick={handleGetNewPlexToken}
+							disabled={plexPinFlow.status === "waiting"}
+							data-testid="plex-get-new-token"
+							className="px-4 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm font-medium hover:bg-slate-600 disabled:opacity-50 border border-slate-600/50"
+						>
+							{plexPinFlow.status === "waiting" ? "Waiting for approval..." : "Get a new token"}
+						</button>
+						{plexTokenSet && plexPinFlow.status !== "waiting" && (
+							<span className="text-xs text-slate-500">A token is currently saved.</span>
+						)}
+					</div>
+					{plexTestResult && (
+						<p
+							className={
+								plexTestResult.type === "ok" ? "text-green-400 text-sm" : "text-amber text-sm"
+							}
+						>
+							{plexTestResult.text}
+						</p>
+					)}
+					{plexPinFlow.status !== "idle" && (
+						<p
+							className={
+								plexPinFlow.status === "error"
+									? "text-amber text-sm"
+									: plexPinFlow.status === "success"
+										? "text-green-400 text-sm"
+										: "text-slate-400 text-sm"
+							}
+						>
+							{plexPinFlow.message}
+						</p>
+					)}
 				</div>
 			</section>
 
@@ -280,36 +479,70 @@ export function SettingsClient({ settings }: SettingsClientProps) {
 						<label className="block text-sm text-slate-400 mb-1">Provider</label>
 						<select
 							value={llmProvider}
-							onChange={(e) => setLlmProvider(e.target.value)}
+							onChange={(e) => handleProviderChange(e.target.value)}
 							className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 text-sm"
 						>
-							<option value="ollama">Ollama</option>
-							<option value="lmstudio">LM Studio</option>
-							<option value="openai">OpenAI-compatible</option>
+							<optgroup label="Local (needs a running engine)">
+								<option value="ollama">Ollama</option>
+								<option value="lmstudio">LM Studio</option>
+								<option value="vllm">vLLM</option>
+							</optgroup>
+							<optgroup label="Cloud (no GPU required)">
+								<option value="openai">OpenAI-compatible</option>
+								<option value="anthropic">Anthropic</option>
+								<option value="deepseek">DeepSeek</option>
+								<option value="openrouter">OpenRouter</option>
+							</optgroup>
 						</select>
+						{(() => {
+							const info = llmProviders.find((p) => p.id === llmProvider);
+							if (!info) return null;
+							return (
+								<p className="text-xs text-slate-500 mt-1">
+									{info.kind === "cloud"
+										? info.configured
+											? "API key configured."
+											: "No API key configured yet - paste one below."
+										: "Local engine - no API key needed, just make sure it's running."}
+								</p>
+							);
+						})()}
 					</div>
+					{!KEYSTORE_CLOUD_PROVIDERS.includes(llmProvider) && (
+						<div>
+							<label className="block text-sm text-slate-400 mb-1">
+								{llmProvider === "openai" ? "Base URL (optional override)" : "Base URL"}
+							</label>
+							<input
+								type="url"
+								value={llmBaseUrl}
+								onChange={(e) => setLlmBaseUrl(e.target.value)}
+								placeholder="http://127.0.0.1:11434"
+								className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 placeholder-slate-500 text-sm"
+							/>
+						</div>
+					)}
 					<div>
-						<label className="block text-sm text-slate-400 mb-1">Base URL</label>
-						<input
-							type="url"
-							value={llmBaseUrl}
-							onChange={(e) => setLlmBaseUrl(e.target.value)}
-							placeholder="http://127.0.0.1:11434"
-							className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 placeholder-slate-500 text-sm"
-						/>
-					</div>
-					<div>
-						<label className="block text-sm text-slate-400 mb-1">API key (optional)</label>
+						<label className="block text-sm text-slate-400 mb-1">
+							{llmProviders.find((p) => p.id === llmProvider)?.kind === "cloud"
+								? "API key"
+								: "API key (optional)"}
+						</label>
 						<input
 							type="password"
 							value={llmApiKey}
 							onChange={(e) => setLlmApiKey(e.target.value)}
 							placeholder={
-								settings.llm_api_key_set ? "Leave blank to keep current" : "For OpenAI-compatible"
+								llmProviders.find((p) => p.id === llmProvider)?.configured
+									? "Leave blank to keep current"
+									: settings.llm_api_key_set
+										? "Leave blank to keep current"
+										: "Paste your API key"
 							}
 							className="w-full px-4 py-2 rounded-lg glass-panel border border-slate-600/50 text-slate-200 placeholder-slate-500 text-sm"
 						/>
 					</div>
+					<VramPanel />
 					<div>
 						<label className="block text-sm text-slate-400 mb-1">
 							Default model (for Chat, saved in browser)

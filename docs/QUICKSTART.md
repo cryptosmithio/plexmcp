@@ -6,7 +6,7 @@ Assumes **Plex Media Server** is already running and you have an [X-Plex-Token](
 
 ## A — MCP only (agents / Cursor / Claude Desktop)
 
-1. `git clone https://github.com/sandraschi/plex-mcp.git` then `cd plex-mcp`
+1. `git clone https://github.com/sandraschi/plexmcp.git plex-mcp` then `cd plex-mcp`
 2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then `uv sync`
 3. Set `PLEX_TOKEN` and `PLEX_URL` (often `http://127.0.0.1:32400`)
 4. Run: `uv run plex-mcp-advanced`

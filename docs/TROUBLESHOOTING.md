@@ -26,7 +26,8 @@ Faster path: [QUICKSTART.md](QUICKSTART.md).
 
 ## Plex authentication
 
-- Regenerate the token from Plex Web (**Settings → Account → Authorized devices**) if requests return 401.  
+- **Webapp → Settings → Plex** has two buttons for exactly this: **Test connection** (checks the current URL/token against your real server and reports why it failed) and **Get a new token** (real Plex sign-in flow — opens app.plex.tv, you approve, the token is saved automatically). Use these first before manually hunting for a token.
+- Manual alternative: regenerate the token from Plex Web (**Settings → Account → Authorized devices**) if requests return 401.
 - Test in a browser: `http://YOUR_PLEX:32400/?X-Plex-Token=YOUR_TOKEN`
 
 ## Connection refused

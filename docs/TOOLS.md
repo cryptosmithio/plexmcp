@@ -28,7 +28,7 @@ All 22 tools are FastMCP 3.2 aligned (`version="1.0.0"`, `annotations=READ_ONLY|
 | `plex_help` | `READ_ONLY` | Tool discovery, capability overview |
 | `plex_audio_mgr` | `MUTATING` | Audio stream management |
 | `plex_ffmpeg_mgr` | `DESTRUCTIVE` | FFmpeg process management |
-| `plex_media_enrichment` | `READ_ONLY` | Wikipedia-style enrichment |
+| `plex_media_enrichment` | `MUTATING` | Wikipedia + TMDB + JustWatch quick lookups, and deep LLM-synthesised per-item dossiers with library cross-references (writes to local `data/enrichment.db`) |
 | `arr_stack` | `READ_ONLY` | Optional Radarr/Sonarr/Lidarr HTTP status (requires env URLs + API keys) |
 | `agentic_plex_workflow` | `MUTATING` | Multi-step agentic flow with sampling |
 | `plex_natural_assistant` | `MUTATING` | Single-turn natural language via sampling |

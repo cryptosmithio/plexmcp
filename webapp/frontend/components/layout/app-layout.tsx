@@ -2,6 +2,7 @@
 
 import { useZoom } from "@/hooks/useZoom";
 import { useEffect, useState } from "react";
+import { FirstRunWizard } from "../onboarding/FirstRunWizard";
 import { BackendStatusBanner } from "./backend-status-banner";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -35,6 +36,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
 	return (
 		<div className="min-h-screen flex flex-col">
+			<FirstRunWizard />
 			<BackendStatusBanner />
 			<Topbar />
 			<div className="flex flex-1">

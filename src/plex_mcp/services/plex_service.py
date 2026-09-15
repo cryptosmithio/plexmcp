@@ -191,8 +191,12 @@ class PlexService:
 
         # Callers pass `libtype`; PlexServer.search() accepts only `mediatype`
         # (plexapi 4.x). Section.search() accepts `libtype` directly.
+        # `media_type` is accepted as an alias for `libtype` since API/tool callers
+        # use that name; both are popped so neither leaks into **kwargs, which would
+        # otherwise be forwarded as an unrecognized filter field or unexpected kwarg.
         kwargs = dict(kwargs)
-        libtype = kwargs.pop("libtype", None)
+        libtype = kwargs.pop("libtype", None) or kwargs.pop("media_type", None)
+        kwargs.pop("media_type", None)
 
         if library_id:
             section = self.server.library.sectionByID(int(library_id))
@@ -208,10 +212,18 @@ class PlexService:
         else:
             # PlexServer.search() accepts limit but not container_start in newer plexapi.
             _fetch = limit + offset if offset else limit
-            if libtype:
-                results = self.server.search(query, limit=_fetch, mediatype=libtype, **kwargs)
+            if kwargs:
+                # PlexServer.search() (Hub search) has a fixed signature with no **kwargs
+                # support, so forwarding any advanced filter (title, genre, actor, year,
+                # ...) raises TypeError: search() got an unexpected keyword argument.
+                # Library.search() searches across every section and does accept
+                # arbitrary filter kwargs, so route advanced filters there instead.
+                title_filter = kwargs.pop("title", None) or query
+                results = self.server.library.search(title=title_filter, libtype=libtype, **kwargs)[:_fetch]
+            elif libtype:
+                results = self.server.search(query, limit=_fetch, mediatype=libtype)
             else:
-                results = self.server.search(query, limit=_fetch, **kwargs)
+                results = self.server.search(query, limit=_fetch)
             if offset:
                 results = results[offset : offset + limit]
 
@@ -1539,7 +1551,8 @@ class PlexService:
                         # Skip large binary data or complex objects
                         if not isinstance(value, (bytes, bytearray, type(item))):
                             metadata["metadata"][attr] = value
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Skipping unreadable attribute %s: %s", attr, e)
                         continue
 
             return metadata
@@ -1806,8 +1819,8 @@ class PlexService:
             for client in self.server.clients():
                 if client.machineIdentifier == client_identifier:
                     return client
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Client lookup via server.clients() failed: %s", e)
 
         # Try Method 2: From active sessions
         try:
@@ -1816,8 +1829,8 @@ class PlexService:
                     for player in session.players:
                         if player.machineIdentifier == client_identifier:
                             return player
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Client lookup via active sessions failed: %s", e)
 
         # Try Method 3: From account resources (same as _get_clients_sync)
         try:
@@ -1831,8 +1844,8 @@ class PlexService:
                     machine_id = getattr(resource, "clientIdentifier", getattr(resource, "machineIdentifier", ""))
                     if machine_id == client_identifier:
                         return resource
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Client lookup via account resources failed: %s", e)
 
         return None
 
@@ -1998,8 +2011,8 @@ class PlexService:
                     if c.machineIdentifier == client_identifier:
                         plexapi_client = c
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("plexapi client lookup failed, will try direct API: %s", e)
 
             if plexapi_client and hasattr(plexapi_client, "playMedia"):
                 try:

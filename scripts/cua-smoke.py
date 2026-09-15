@@ -209,8 +209,8 @@ def cua_ocr_text(window_handle: int = 0, image_path: str = "") -> str:
             capture = cua_screenshot(window_handle, f"{image_path or 'capture'}.png")
             if capture and os.path.exists(capture):
                 return pytesseract.image_to_string(Image.open(capture))
-    except Exception:
-        pass
+    except Exception as e:
+        log(f"OCR failed: {e}")
     return ""
 
 
@@ -219,8 +219,8 @@ def cua_click(window_handle: int, x: int, y: int):
     try:
         import pywinauto.mouse
         pywinauto.mouse.click(button="left", coords=(x, y))
-    except Exception:
-        pass
+    except Exception as e:
+        log(f"Click at ({x}, {y}) failed: {e}")
 
 
 def _release_mouse():
@@ -232,8 +232,8 @@ def _release_mouse():
         MOUSEEVENTF_MIDDLEUP = 0x0040
         for flag in (MOUSEEVENTF_LEFTUP, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_MIDDLEUP):
             ctypes.windll.user32.mouse_event(flag, 0, 0, 0, 0)
-    except Exception:
-        pass
+    except Exception as e:
+        log(f"Mouse release failed: {e}")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -442,16 +442,16 @@ def _nav_click_element(win_handle: int, wx: int, wy: int, idx: int, label: str =
             if link:
                 link[0].click_input()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Nav click by title={label!r} failed, trying next strategy: {e}")
         try:
             elements = w.descendants(control_type="Hyperlink")
             el = [e for e in elements if label.lower() in (e.window_text() or "").lower()]
             if el:
                 el[0].click_input()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Nav click by Hyperlink text match failed, trying next strategy: {e}")
 
     # Fallback: positional Hyperlink
     try:
@@ -459,9 +459,9 @@ def _nav_click_element(win_handle: int, wx: int, wy: int, idx: int, label: str =
         if idx < len(elements):
             elements[idx].click_input()
             return
-    except Exception:
-        pass
-    # Try Pane (some WebView versions)  
+    except Exception as e:
+        log(f"Nav click by positional Hyperlink failed, trying next strategy: {e}")
+    # Try Pane (some WebView versions)
     try:
         elements = w.descendants(control_type="Pane")
         nav_elements = [e for e in elements if e.rectangle().left < wx + 200]
@@ -469,8 +469,8 @@ def _nav_click_element(win_handle: int, wx: int, wy: int, idx: int, label: str =
         if idx < len(nav_elements_sorted):
             nav_elements_sorted[idx].click_input()
             return
-    except Exception:
-        pass
+    except Exception as e:
+        log_warn(f"Nav click by Pane position failed, falling back to raw coordinates: {e}")
 
     # Fallback to coordinate click
     click_x = wx + int(cfg("sidebar_click_x", 30))
@@ -506,8 +506,8 @@ def nav_click_through(output_dir: str):
         w.set_focus()
         w.maximize()
         time.sleep(1)
-    except Exception:
-        pass
+    except Exception as e:
+        log_warn(f"Could not focus/maximize window before nav walk: {e}")
 
     for idx, (label, expected_header) in enumerate(nav_routes):
         try:
@@ -666,7 +666,10 @@ def main():
     if fatal_failed:
         print("  FATAL phase failure — see above")
         sys.exit(1)
-    print("  ALL PHASES PASSED")
+    if failed:
+        print("  NON-FATAL FAILURES — see above (exit 0, but not a clean run)")
+    else:
+        print("  ALL PHASES PASSED")
     print(f"{'=' * 50}\n")
 
 

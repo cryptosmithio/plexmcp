@@ -146,7 +146,7 @@ if bridge_urls:
                 mcp.add_provider(create_proxy(url))
                 _bridge_proxies.append(url)
             except Exception:
-                pass
+                logging.getLogger(__name__).debug("Could not bridge MCP_BRIDGE_URLS entry %s", url, exc_info=True)
 
 from .fleet_tool_metrics import register_mcp_tool_metrics  # noqa: E402
 
@@ -161,7 +161,7 @@ def plex_capabilities_resource() -> str:
 ## Tools
 Portmanteau: plex_library, plex_media, plex_search, plex_streaming, plex_user, plex_playlist,
 plex_metadata, plex_server, plex_performance, plex_reporting, plex_collections, plex_quality,
-plex_rag, plex_help, plex_integration, plex_audio_mgr, and others — see plex_help(operation='discover').
+plex_rag, plex_help, plex_integration, plex_audio_mgr, and others - see plex_help(operation='discover').
 
 ## Sampling
 - Default: OpenAI-compatible HTTP at PLEX_SAMPLING_BASE_URL (e.g. Ollama http://127.0.0.1:11434/v1).
@@ -227,7 +227,7 @@ def prompt_plex_agentic_pattern() -> str:
     return """Use agentic_plex_workflow with:
 - workflow_prompt: clear goal in natural language.
 - available_tools: exact tool names from this server (e.g. plex_library, plex_search, plex_media).
-- max_iterations: 5–10 typically.
+- max_iterations: 5-10 typically.
 Requires sampling (Ollama at PLEX_SAMPLING_BASE_URL or client sampling). Do not claim actions were performed if tools were not called."""
 
 

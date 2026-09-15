@@ -11,7 +11,14 @@ class MediaEnrichmentService:
     """Service for fetching external high-value metadata about media items."""
 
     def __init__(self):
-        self.http_client = httpx.AsyncClient(timeout=10.0, follow_redirects=True)
+        # Wikimedia's edge (HAProxy) 403s httpx's default UA string outright; any
+        # descriptive UA passes. Without this, fetch_wikipedia_summary silently
+        # returns None on every call - discovered while building deep enrichment.
+        self.http_client = httpx.AsyncClient(
+            timeout=10.0,
+            follow_redirects=True,
+            headers={"User-Agent": "plex-mcp/2.5 (+https://github.com/sandraschi/plexmcp)"},
+        )
 
     async def close(self):
         await self.http_client.aclose()

@@ -1,4 +1,4 @@
-"""LLM API for chat, prompt refine, and workflows (Ollama / OpenAI-compatible)."""
+"""LLM API for chat, prompt refine, and workflows (local + cloud providers)."""
 
 import json
 import logging
@@ -8,6 +8,7 @@ import httpx
 from fastapi import APIRouter, Body
 from fastapi.responses import StreamingResponse
 
+from .. import llm_providers as lp
 from ..chat_context import build_chat_preprompt
 from ..config import settings
 
@@ -16,6 +17,73 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_DEFAULT = "http://127.0.0.1:11434"
 LMSTUDIO_DEFAULT = "http://127.0.0.1:1234/v1"
+
+
+def _registry_provider(provider: str | None) -> dict | None:
+    """Return the registry row for `provider` if it's a known ID, else None
+    (a custom base_url / legacy config that predates the provider registry)."""
+    if not provider:
+        return None
+    return lp.get_provider(provider)
+
+
+# --- Provider registry, onboarding, VRAM (new: local + cloud, GPU-less-safe) --
+
+
+@router.get("/providers")
+async def get_providers():
+    """Registry of local + cloud providers: which are configured, never key bytes."""
+    return {"providers": lp.public_provider_info()}
+
+
+@router.get("/onboarding")
+async def get_onboarding():
+    """Fresh-install starter facts + recommended path (local vs cloud)."""
+    return lp.onboarding_state()
+
+
+@router.get("/gpus")
+async def get_gpus():
+    """Live GPU VRAM telemetry. Empty list on a GPU-less machine - not an error."""
+    return {"gpus": lp.gpu_vram()}
+
+
+@router.get("/loaded")
+async def get_loaded(base_url: str | None = None):
+    """Models currently resident on the local Ollama engine (VRAM KPI)."""
+    return await lp.ollama_loaded(base_url or OLLAMA_DEFAULT)
+
+
+@router.post("/unload")
+async def post_unload(body: dict = Body(default={})):
+    """Evict Ollama models from VRAM. Empty/omitted `keep` evicts everything -
+    the escape hatch when VRAM is full and an AI task needs room to run."""
+    keep = str(body.get("keep") or "").strip()
+    base_url = body.get("base_url") or OLLAMA_DEFAULT
+    result = await lp.switch_ollama_model(keep, base_url)
+    return {"success": True, **result}
+
+
+@router.post("/keys/{provider}")
+async def save_provider_key(provider: str, body: dict = Body(...)):
+    """Save a cloud provider's API key to the 0600 keystore (write-only - never
+    echoed back)."""
+    api_key = str(body.get("api_key") or "")
+    try:
+        lp.save_key(provider, api_key)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    return {"success": True, "provider": provider}
+
+
+@router.delete("/keys/{provider}")
+async def delete_provider_key(provider: str):
+    """Remove a cloud provider's stored API key."""
+    try:
+        deleted = lp.delete_key(provider)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    return {"success": True, "deleted": deleted}
 
 TOOLS = [
     {
@@ -84,7 +152,14 @@ async def list_models(
     provider: str | None = None,
     base_url: str | None = None,
 ):
-    """List available models (Ollama or OpenAI-compatible)."""
+    """List available models. Cloud providers (Anthropic, DeepSeek, OpenRouter,
+    keyed OpenAI) go through the provider registry for correct auth; a custom
+    base_url always overrides (points a local engine at a non-default port)."""
+    if not (base_url and base_url.strip()):
+        row = _registry_provider(provider)
+        if row is not None:
+            result = await lp.list_provider_models(row["id"])
+            return {"models": result["models"], "provider": row["id"], "source": result["source"]}
     url = _get_base_url(provider, base_url)
     if ":11434" in url or "ollama" in url.lower():
         try:
@@ -141,6 +216,29 @@ async def chat(
                 messages = [{"role": "system", "content": system_content}] + rest
         except Exception as e:
             logger.warning("Chat preprompt build failed: %s", e)
+
+    row = _registry_provider(provider) if not (base_url and base_url.strip()) else None
+    if row is not None and row["kind"] == "cloud":
+        # Cloud providers (including Anthropic, whose format the old ollama/
+        # openai-compatible branches below can't speak) go through the
+        # registry for correct auth headers and message-format conversion.
+        if stream:
+
+            async def _stream_registry():
+                try:
+                    async for chunk in lp.chat_stream(row["id"], model, messages):
+                        yield chunk
+                except Exception as e:
+                    logger.warning("Registry chat stream (%s) failed: %s", row["id"], e)
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n".encode()
+
+            return StreamingResponse(_stream_registry(), media_type="text/event-stream")
+        try:
+            content = await lp.chat_complete(row["id"], model, messages)
+        except Exception as e:
+            return {"error": str(e), "status": 502}
+        return {"message": {"role": "assistant", "content": content}}
+
     url = _get_base_url(provider, base_url)
     if ":11434" in url or "ollama" in url.lower():
         req_url = f"{url}/api/chat"
@@ -185,7 +283,16 @@ async def chat(
         return r.json()
 
 
-async def _llm_call(messages: list, model: str, url: str, tools: list | None = None) -> dict | None:
+async def _llm_call(
+    messages: list, model: str, url: str, tools: list | None = None, provider: str | None = None
+) -> dict | None:
+    """OpenAI-shaped chat call (choices[0].message, optional tool_calls).
+
+    Anthropic is deliberately not routed through here - its message/tool
+    format is different (content blocks, not choices) and the extraction
+    helpers below assume OpenAI shape. Callers keep Anthropic on the plain
+    chat_complete() path (see _agentic_impl) instead of half-supporting tools.
+    """
     if ":11434" in url or "ollama" in url.lower():
         payload = {"model": model, "messages": messages, "stream": False}
         if tools:
@@ -197,15 +304,25 @@ async def _llm_call(messages: list, model: str, url: str, tools: list | None = N
             except httpx.ConnectError:
                 return None
     headers = {"Content-Type": "application/json"}
-    key = os.environ.get("LLM_API_KEY") or settings.LLM_API_KEY
-    if key:
-        headers["Authorization"] = f"Bearer {key}"
+    row = _registry_provider(provider) if provider else None
+    if row is not None and row["kind"] == "cloud":
+        # Registry rows know their own exact chat path (providers disagree on
+        # whether it's prefixed with /v1) - use it instead of guessing.
+        key = lp.get_key(row["id"])
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        chat_url = row["base_url"] + row["chat_path"]
+    else:
+        key = os.environ.get("LLM_API_KEY") or settings.LLM_API_KEY
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        chat_url = f"{url}/v1/chat/completions"
     payload = {"model": model, "messages": messages, "stream": False}
     if tools:
         payload["tools"] = tools
     async with httpx.AsyncClient(timeout=120.0) as client:
         try:
-            r = await client.post(f"{url}/v1/chat/completions", json=payload, headers=headers)
+            r = await client.post(chat_url, json=payload, headers=headers)
             return r.json() if r.status_code == 200 else None
         except httpx.ConnectError:
             return None
@@ -273,6 +390,18 @@ async def _agentic_impl(
     provider: str | None,
     base_url: str | None,
 ) -> dict:
+    row = _registry_provider(provider)
+    if row is not None and row["id"] == "anthropic":
+        # Anthropic's tool-use format is content blocks, not OpenAI-style
+        # tool_calls - the extraction helpers below assume OpenAI shape.
+        # Graceful degrade: answer directly, no Plex tool-calling, rather
+        # than send it a request format it can't parse.
+        try:
+            content = await lp.chat_complete("anthropic", model, messages)
+        except Exception as e:
+            return {"message": {"role": "assistant", "content": f"Anthropic request failed: {e}"}}
+        return {"message": {"role": "assistant", "content": content or "Done."}}
+
     url = _get_base_url(provider, base_url)
     system_msgs = [m for m in messages if m["role"] == "system"]
     history = [m for m in messages if m["role"] in ("user", "assistant")]
@@ -281,7 +410,7 @@ async def _agentic_impl(
 
     ctx = [*system_msgs, *history]
     for _turn in range(5):
-        data = await _llm_call(ctx, model, url, tools=TOOLS)
+        data = await _llm_call(ctx, model, url, tools=TOOLS, provider=provider)
         msg = _extract_message(data)
         if not msg:
             return {"message": {"role": "assistant", "content": "LLM not reachable"}}
@@ -304,7 +433,7 @@ async def _agentic_impl(
                 result_str = result_str[:4000] + "\n... (truncated)"
             ctx.append({"role": "tool", "content": result_str, "tool_call_id": tc.get("id", ""), "name": name})
 
-    last_msg = _extract_message(await _llm_call(ctx, model, url))
+    last_msg = _extract_message(await _llm_call(ctx, model, url, provider=provider))
     return {
         "message": {"role": "assistant", "content": _extract_content(last_msg) or "I need more specific information."}
     }

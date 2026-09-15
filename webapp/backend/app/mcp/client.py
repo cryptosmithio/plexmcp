@@ -120,6 +120,16 @@ class MCPClient:
                 # Merge metadata (prefabs, etc)
                 if result.meta:
                     out["_meta"] = result.meta
+                    # Tools whose human-readable content is a text summary (not a
+                    # dict) have nowhere else to carry the raw list/dict for REST
+                    # consumers — they put it in meta["data"]. Promote it to the
+                    # top level unless something already claimed "data".
+                    if "data" not in out and isinstance(result.meta, dict) and "data" in result.meta:
+                        raw_meta_data = result.meta["data"]
+                        if isinstance(raw_meta_data, list):
+                            out["data"] = [_json_safe_media_item(x) for x in raw_meta_data]
+                        else:
+                            out["data"] = _json_safe_media_item(raw_meta_data)
 
                 # Extract structured content (Prefab wire JSON for interactive cards)
                 if hasattr(result, "structured_content") and result.structured_content:

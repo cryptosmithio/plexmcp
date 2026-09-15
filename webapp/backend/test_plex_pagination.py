@@ -2,16 +2,15 @@ import os
 
 from plexapi.server import PlexServer
 
-base_url = "http://127.0.0.1:32400"
-token = "oGA9iEfVYh8ATXmzYrU8"
+base_url = os.environ.get("PLEX_URL", "http://127.0.0.1:32400")
+token = os.environ.get("PLEX_TOKEN", "")
 
 
 def test_pagination():
+    if not token:
+        print("PLEX_TOKEN not set — skipping (set it in .env to run this manual script)")
+        return
     try:
-        # Use IPv4
-        os.environ["PLEX_URL"] = base_url
-        os.environ["PLEX_TOKEN"] = token
-
         plex = PlexServer(base_url, token)
         sections = plex.library.sections()
         if not sections:

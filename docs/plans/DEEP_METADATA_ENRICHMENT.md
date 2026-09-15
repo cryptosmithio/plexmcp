@@ -1,9 +1,43 @@
 # Deep Metadata Enrichment — Spec
 
 **Author:** Claude Opus 4.7 (Anthropic), April 2026
-**Status:** design
+**Status:** **Shipped 2026-09-13** (Claude Sonnet 5). See "What actually shipped" below for scope decisions vs. this original design.
 **Effort:** 3–4 days
 **Priority:** 1 of 6 — build this first
+
+---
+
+## What actually shipped (2026-09-13)
+
+Built as designed below, with two deliberate scope decisions made with Sandra
+before implementation:
+
+- **Sources: Wikipedia + TMDB (deep) + JustWatch only.** Letterboxd, IMDB,
+  Rotten Tomatoes, Metacritic, and Criterion were explicitly cut — all four
+  prohibit scraping in their ToS and run active bot detection; at 50k library
+  items that's real exposure, not a style nitpick. Wikipedia and TMDB both
+  have real, documented APIs; JustWatch is a best-effort call against its
+  public (undocumented but non-authenticated) JSON endpoint, always optional
+  and never blocking.
+- **Cross-references compare against the already-enriched set, not a live
+  Plex-wide person index.** `extract_cross_references` matches director,
+  shared top-5 cast, TMDB collection, and thematic-tag overlap (>=2 tags)
+  against rows already in `media_enrichment` — cross-refs get denser as more
+  of the library gets enriched, same "starts feeling like a graph" goal as
+  the original design, without a new live-Plex person-scan capability.
+
+Also: found and fixed a real bug while building this — Wikimedia's edge
+(HAProxy) 403s httpx's default User-Agent string outright, so
+`enrichment_service.fetch_wikipedia_summary` was silently returning `None` on
+every call before this session. Fixed by adding a descriptive UA
+(`webapp/backend` and `src/plex_mcp` httpx clients hitting Wikipedia/TMDB/
+JustWatch now all send one).
+
+Data model, orchestrator shape (fetch -> merge -> synthesise -> cross-ref ->
+persist), and the MCP tool + REST + frontend surface all match this spec.
+sqlite lives at `data/enrichment.db` (not the original `.env`-adjacent path -
+same directory as the LanceDB RAG store). Full file list and test coverage:
+`CHANGELOG.md` and `docs/plans/OPERATIONAL_IMPROVEMENTS.md`.
 
 ---
 
@@ -442,10 +476,16 @@ we don't have yet. Defer.
 
 ## Update on completion
 
-- Add v2.5.0 entry to CHANGELOG
-- Mark shipped in `docs/plans/README.md`
-- Update `FLEET_INDEX.md` in mcp-central-docs
-- Update `README.md` main repo with screenshot of detail page
+- [x] CHANGELOG entry added (dated 2026-09-13, under `[Unreleased]` per this
+      session's convention rather than a version bump - that's a separate
+      release-management decision left for later)
+- [x] Marked shipped in `docs/plans/ROADMAP.md` and `docs/plans/README.md`
+- [x] `mcp-central-docs/projects/plex-mcp/{STATUS.md,CHANGELOG.md}` mirrored
+- [ ] `FLEET_INDEX.md` in mcp-central-docs — not touched this session, do
+      when someone next does a fleet-wide capability sweep
+- [ ] README screenshot of the detail page — no image-capture workflow was
+      run this session; the page is described in prose in `README.md`/`WEBAPP.md`
+      instead
 
 ---
 

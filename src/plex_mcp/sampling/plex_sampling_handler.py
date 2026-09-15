@@ -255,7 +255,7 @@ def _plex_degraded_response_text(user_text: str, has_tools: bool) -> str:
         )
     )
     return (
-        "[PlexMCP sampling — HTTP LLM unreachable]\n\n"
+        "[PlexMCP sampling - HTTP LLM unreachable]\n\n"
         f"{tool_note}\n\n"
         "Portmanteau tools still work without sampling: plex_library, plex_media, plex_search, "
         "plex_streaming, plex_rag (after sync_metadata). "

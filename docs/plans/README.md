@@ -14,7 +14,7 @@ without reading the others.
 | File                              | Project                     | Effort |
 |-----------------------------------|------------------------------|--------|
 | `ROADMAP.md`                      | Overview and ordering        | —      |
-| `DEEP_METADATA_ENRICHMENT.md`     | Rich per-item metadata       | 3–4 d  |
+| `DEEP_METADATA_ENRICHMENT.md`     | Rich per-item metadata — **shipped 2026-09-13** | 3–4 d  |
 | `TASTE_MODELLING.md`              | User preference profile      | 2–3 d  |
 | `MOOD_PICKER.md`                  | Nightly "what to watch"      | 1–2 d  |
 | `SUBTITLE_RAG.md`                 | Semantic search over subs    | 4–5 d  |

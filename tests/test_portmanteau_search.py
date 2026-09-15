@@ -30,6 +30,18 @@ class TestPlexSearch:
             assert "result" in text.lower()
 
     @pytest.mark.asyncio
+    async def test_search_operation_forwards_media_type(self, mock_plex_service):
+        """media_type must reach PlexService.search_media, not be silently dropped."""
+        with patch("plex_mcp.tools.portmanteau.search._get_plex_service", return_value=mock_plex_service):
+            await (plex_search.fn if hasattr(plex_search, "fn") else plex_search)(
+                operation="search", query="anime", media_type="show"
+            )
+
+        mock_plex_service.search_media.assert_awaited_once()
+        _, kwargs = mock_plex_service.search_media.call_args
+        assert kwargs.get("media_type") == "show"
+
+    @pytest.mark.asyncio
     async def test_search_operation_missing_query(self, mock_plex_service):
         """Test search operation requires query."""
         with patch("plex_mcp.tools.portmanteau.search._get_plex_service", return_value=mock_plex_service):

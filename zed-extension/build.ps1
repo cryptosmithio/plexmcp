@@ -1,5 +1,7 @@
 # Zed Extension Build Script for PlexMediaServer
 # Run this script to build the Rust extension for Zed IDE
+# Self-contained: always operates on this directory regardless of caller's cwd.
+Set-Location $PSScriptRoot
 
 rustup target add wasm32-wasip1
 
