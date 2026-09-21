@@ -1,4 +1,19 @@
 
+## [Unreleased] — 2026-09-21
+
+### Added (Prefab cards render in the webapp chat)
+- **Tool-call Prefab cards now reach the browser.** `POST /api/llm/agentic` ran MCP tool calls and returned only the assistant text - the tool's Prefab card (`structured_content`, exposed by `webapp/backend/app/mcp/client.py` as `_prefab`) was serialised into the LLM context and discarded before it reached the frontend. The endpoint now collects each turn's cards and returns them as `prefabs: [{tool, prefab}]`; `webapp/frontend/app/chat/page.tsx` renders them under the assistant message.
+- **New `PrefabRenderer`** (`webapp/frontend/components/prefab/prefab-renderer.tsx`) - renders the subset of `prefab_ui` wire components plex-mcp's builders emit: Div, Row, Grid, Card, CardHeader, CardTitle, CardDescription, CardContent, H2-H4, P, Text, Small, Metric, Badge, Separator, Image. Unknown component types fall through to their children rather than disappearing, and the renderer never throws on malformed payloads.
+- **`/dev/prefab` preview route** renders ground-truth fixtures (`components/prefab/fixtures.ts`) so the renderer can be exercised without a live Plex server.
+- **Tailwind safelist** for the layout utilities Prefab cards carry (`grid-cols-*` with breakpoint variants, `gap-*`, `my-*`). Prefab classes arrive as server JSON at runtime, so they never appear in source and were being purged from the build.
+
+### Notes
+- The wire format was captured from real `PrefabApp.to_json()` output rather than inferred from the Python API. Points worth knowing if this is extended: the discriminant is `type` (class name), text lives in `content`, `children` is the recursive array, props are camelCase, `None` values are omitted, and **`Badge` carries its text in `label`, not `content`**.
+- `PrefabApp.model_dump()` / FastAPI's `jsonable_encoder()` on a bare `PrefabApp` produce a *hollow* tree (children lose `type` and `content`) because `children` is typed as the base `Component`. FastMCP's `ToolResult` normalises `structured_content` to the correct wire dict, so the pipeline is fine as long as serialisation goes through `ToolResult` or `PrefabApp.to_json()`.
+
+### Changed
+- **Agentic tool results no longer send the Prefab tree to the model.** `_prefab` is stripped from the string fed back as the `tool` message: it is UI, not information, and a single `list_libraries` card measured ~22 KB - previously dumped in and truncated at 4 KB, which both wasted context and truncated the actual library data the model needed to answer.
+
 ## [Unreleased] — 2026-09-13
 
 ### Added (Deep metadata enrichment)
@@ -113,11 +128,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.5.0] - 2026-04-19
 ### Added
-- **Dialogue RAG (Subtitle Neural Search)**: Complete end-to-end implementation for semantic search across media dialogue. 
+- **Dialogue RAG (Subtitle Neural Search)**: Complete end-to-end implementation for semantic search across media dialogue.
   - New `sync_subtitles` operation in `plex_rag` tool to index SRT/VTT tracks.
   - New `search_subtitles` operation for deep content discovery via dialogue snippets.
   - Robust SRT/VTT parser with timestamp extraction and dialogue normalization.
-- **Webapp Subtitle Management**: 
+- **Webapp Subtitle Management**:
   - Updated RAG Dashboard with "Sync Subtitles" control and real-time dialogue indexing telemetry.
   - New "Dialogue Search" mode in the web search interface with timestamped results and media linking.
 - **Multi-Table Vector Store**: Extended LanceDB configuration to support concurrent metadata and subtitle indices.
@@ -145,7 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Codebase Hardening**: Purged all executable `print` statements in configuration and tool modules to ensure strict JSON-RPC protocol compliance.
-- **Ruff Standard**: Aligned with 120-character line length and expanded SOTA linting rules. 
+- **Ruff Standard**: Aligned with 120-character line length and expanded SOTA linting rules.
 - **Webapp Performance**: Optimized Next.js dashboard with adjacent port assignments (10741/10742).
 
 ### Fixed
@@ -350,4 +365,3 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduc
 ## Version History
 - **2.0.0**: Production-ready with MCPB packaging and GLAMA Gold Status
 - **1.0.0**: Initial release with basic Plex Media Server integration
-

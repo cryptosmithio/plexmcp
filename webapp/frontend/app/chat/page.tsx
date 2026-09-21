@@ -1,5 +1,7 @@
 "use client";
 
+import { PrefabRenderer } from "@/components/prefab/prefab-renderer";
+import type { PrefabPayload } from "@/components/prefab/prefab-types";
 import { API_BASE } from "@/utils/api";
 import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +10,8 @@ interface Message {
 	role: "user" | "assistant";
 	content: string;
 	ts?: string;
+	/** Prefab cards produced by MCP tool calls made during this turn. */
+	prefabs?: PrefabPayload[];
 }
 
 const STORAGE_KEY = "plex-mcp-chat-history";
@@ -74,10 +78,17 @@ function loadMessages(): Message[] {
 }
 
 function saveMessages(msgs: Message[]) {
+	const trimmed = msgs.slice(-MAX_MESSAGES);
 	try {
-		const trimmed = msgs.slice(-MAX_MESSAGES);
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-	} catch {}
+	} catch {
+		// Prefab cards can run to several KB each. If the quota is blown, keep
+		// the conversation text rather than silently losing all history.
+		try {
+			const withoutPrefabs = trimmed.map((m) => ({ ...m, prefabs: undefined }));
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(withoutPrefabs));
+		} catch {}
+	}
 }
 
 function loadPersonality(): string {
@@ -258,9 +269,16 @@ export default function ChatPage() {
 				const msg = data.message as { content?: string } | undefined;
 				const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
 				const content = msg?.content ?? choices?.[0]?.message?.content ?? JSON.stringify(data);
+				// Prefab cards from tool calls the backend ran during this turn.
+				const prefabs = Array.isArray(data.prefabs) ? (data.prefabs as PrefabPayload[]) : [];
 				setMessages((m) => [
 					...m,
-					{ role: "assistant", content: String(content), ts: new Date().toISOString() },
+					{
+						role: "assistant",
+						content: String(content),
+						ts: new Date().toISOString(),
+						...(prefabs.length > 0 ? { prefabs } : {}),
+					},
 				]);
 			}
 		} catch (e) {
@@ -416,6 +434,11 @@ export default function ChatPage() {
 							}`}
 						>
 							<p className="whitespace-pre-wrap">{msg.content}</p>
+							{msg.prefabs?.map((p, pi) => (
+								<div key={`${p.tool ?? "tool"}-${pi}`} className="mt-3">
+									<PrefabRenderer envelope={p.prefab} />
+								</div>
+							))}
 						</div>
 					</div>
 				))}

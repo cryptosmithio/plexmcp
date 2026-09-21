@@ -85,6 +85,7 @@ async def delete_provider_key(provider: str):
         return {"success": False, "error": str(e)}
     return {"success": True, "deleted": deleted}
 
+
 TOOLS = [
     {
         "type": "function",
@@ -390,6 +391,9 @@ async def _agentic_impl(
     provider: str | None,
     base_url: str | None,
 ) -> dict:
+    # Prefab cards produced by tool calls during this turn. Returned to the
+    # frontend so the webapp can render the same cards an MCP host renders.
+    prefabs: list[dict] = []
     row = _registry_provider(provider)
     if row is not None and row["id"] == "anthropic":
         # Anthropic's tool-use format is content blocks, not OpenAI-style
@@ -400,25 +404,34 @@ async def _agentic_impl(
             content = await lp.chat_complete("anthropic", model, messages)
         except Exception as e:
             return {"message": {"role": "assistant", "content": f"Anthropic request failed: {e}"}}
-        return {"message": {"role": "assistant", "content": content or "Done."}}
+        return {"message": {"role": "assistant", "content": content or "Done."}, "prefabs": prefabs}
 
     url = _get_base_url(provider, base_url)
     system_msgs = [m for m in messages if m["role"] == "system"]
     history = [m for m in messages if m["role"] in ("user", "assistant")]
     if not history:
-        return {"message": {"role": "assistant", "content": "Send a message to start."}}
+        return {
+            "message": {"role": "assistant", "content": "Send a message to start."},
+            "prefabs": prefabs,
+        }
 
     ctx = [*system_msgs, *history]
     for _turn in range(5):
         data = await _llm_call(ctx, model, url, tools=TOOLS, provider=provider)
         msg = _extract_message(data)
         if not msg:
-            return {"message": {"role": "assistant", "content": "LLM not reachable"}}
+            return {
+                "message": {"role": "assistant", "content": "LLM not reachable"},
+                "prefabs": prefabs,
+            }
 
         content = _extract_content(msg)
         tool_calls = _extract_tool_calls(msg)
         if not tool_calls:
-            return {"message": {"role": "assistant", "content": content or "Done."}}
+            return {
+                "message": {"role": "assistant", "content": content or "Done."},
+                "prefabs": prefabs,
+            }
 
         ctx.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls})
         for tc in tool_calls:
@@ -428,14 +441,30 @@ async def _agentic_impl(
             parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
 
             result = await _dispatch_mcp(name, parsed_args)
-            result_str = json.dumps(result, default=str, ensure_ascii=False)
+
+            # Surface the tool's Prefab card. FastMCP normalises a PrefabApp to
+            # the prefab_ui wire dict on structured_content, which client.py
+            # exposes as "_prefab".
+            if isinstance(result, dict):
+                prefab = result.get("_prefab")
+                if prefab:
+                    prefabs.append({"tool": name, "prefab": prefab})
+
+            # Feed the model the domain data only: the Prefab tree is UI, not
+            # information, and runs to several KB per card - pure context waste.
+            llm_view = {k: v for k, v in result.items() if k != "_prefab"} if isinstance(result, dict) else result
+            result_str = json.dumps(llm_view, default=str, ensure_ascii=False)
             if len(result_str) > 4000:
                 result_str = result_str[:4000] + "\n... (truncated)"
             ctx.append({"role": "tool", "content": result_str, "tool_call_id": tc.get("id", ""), "name": name})
 
     last_msg = _extract_message(await _llm_call(ctx, model, url, provider=provider))
     return {
-        "message": {"role": "assistant", "content": _extract_content(last_msg) or "I need more specific information."}
+        "message": {
+            "role": "assistant",
+            "content": _extract_content(last_msg) or "I need more specific information.",
+        },
+        "prefabs": prefabs,
     }
 
 
