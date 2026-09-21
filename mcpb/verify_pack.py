@@ -70,13 +70,17 @@ def check_ast(entry_file: str) -> None:
         elif isinstance(node, ast.Assign):
             for t in node.targets:
                 bound |= _target_names(t)
-        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
-            bound |= _target_names(node.target)
-        elif isinstance(node, ast.NamedExpr):
-            bound |= _target_names(node.target)
-        elif isinstance(node, (ast.For, ast.AsyncFor)):
-            bound |= _target_names(node.target)
-        elif isinstance(node, ast.comprehension):
+        elif isinstance(
+            node,
+            (
+                ast.AugAssign,
+                ast.AnnAssign,
+                ast.NamedExpr,
+                ast.For,
+                ast.AsyncFor,
+                ast.comprehension,
+            ),
+        ):
             bound |= _target_names(node.target)
         elif isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:

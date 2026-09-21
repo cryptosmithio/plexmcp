@@ -1,7 +1,16 @@
 "use client";
 
 import { API_BASE } from "@/utils/api";
-import { ChevronDown, Container, ExternalLink, FileText, Film, HelpCircle, Moon, Sun } from "lucide-react";
+import {
+	ChevronDown,
+	Container,
+	ExternalLink,
+	FileText,
+	Film,
+	HelpCircle,
+	Moon,
+	Sun,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { HelpModal } from "./help-modal";
@@ -194,7 +203,11 @@ export function Topbar() {
 							type="button"
 							onClick={toggle}
 							className="p-2 rounded-md text-slate-400 hover:bg-slate-700/50 hover:text-amber"
-							title={light ? "Switch to dark (experimental light mode)" : "Switch to light (experimental, ugly)"}
+							title={
+								light
+									? "Switch to dark (experimental light mode)"
+									: "Switch to light (experimental, ugly)"
+							}
 							aria-label="Toggle light mode (experimental)"
 						>
 							{light ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}

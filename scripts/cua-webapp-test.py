@@ -88,7 +88,7 @@ def kill_stale():
     """Kill processes holding backend/frontend ports (via temp PS script)."""
     ports = [str(p) for p in (BACKEND_PORT, FRONTEND_PORT) if p]
     if not ports:
-        return
+        return None
     ps = (
         "\n".join(
             [
@@ -112,7 +112,7 @@ def kill_stale():
         )
     finally:
         with suppress(OSError):
-            os.remove(path)
+            Path(path).unlink()
     log(f"Cleared ports {', '.join(ports)}")
     time.sleep(2)
     return True
@@ -295,7 +295,7 @@ def nav_click_through(output_dir, win):
     if not isinstance(nav_routes, list) or not nav_routes:
         log("No nav_routes in config — nav walk skipped")
         return True
-    os.makedirs(output_dir, exist_ok=True)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     try:
         win.maximize()
         time.sleep(1)

@@ -33,7 +33,7 @@ export default function Home() {
 					}
 				} catch {
 					if (cancelled) return;
-					const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
+					const delay = Math.min(1000 * 2 ** retryCount.current, 30000);
 					retryCount.current++;
 					setStatus(null);
 					await new Promise((r) => setTimeout(r, delay));

@@ -50,6 +50,14 @@
 		}
 	],
 	"files": {
-		"ignore": ["node_modules", ".next", "out", "build"]
+		"ignore": [
+			"node_modules",
+			".next",
+			"out",
+			"build",
+			"test-results",
+			"playwright-report",
+			"coverage"
+		]
 	}
 }

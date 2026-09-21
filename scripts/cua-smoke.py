@@ -33,6 +33,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
+from typing import NoReturn
 
 # ── Config ────────────────────────────────────────────────────────────
 
@@ -63,9 +65,6 @@ CUA_SMOKE_VERSION = 3  # bump when template changes; see docstring
 
 def _check_version():
     """Warn if this file doesn't match the template version."""
-    from pathlib import Path
-
-    ver_file = Path(__file__)
     # If the template path exists, compare versions
     tpl = Path(os.getenv("MCP_CENTRAL_DOCS", "")) / "templates/tauri-native/scripts/cua-smoke.py"
     if tpl.exists():
@@ -124,6 +123,7 @@ def log_warn(msg: str):
 try:
     import pywinauto
     import pywinauto.findwindows
+
     _HAS_PYWAUTO = True
 except ImportError:
     _HAS_PYWAUTO = False
@@ -138,7 +138,7 @@ def _find_tauri_window(title_re: str):
     wins = pywinauto.findwindows.find_elements(title_re=title_re)
     tauri = [w for w in wins if w.class_name != "QMainWindow"]
     if not tauri:
-        raise RuntimeError(f"No Tauri window found (classes: {set(w.class_name for w in wins)})")
+        raise RuntimeError(f"No Tauri window found (classes: { {w.class_name for w in wins} })")
     return tauri[0].handle
 
 
@@ -163,7 +163,11 @@ def cua_find_window(title_re: str = "") -> dict | None:
         rect = win.rectangle()
         w = rect.width if isinstance(rect.width, int) else rect.width()
         h = rect.height if isinstance(rect.height, int) else rect.height()
-        return {"handle": handle, "title": win.window_text(), "rect": {"left": rect.left, "top": rect.top, "width": w, "height": h}}
+        return {
+            "handle": handle,
+            "title": win.window_text(),
+            "rect": {"left": rect.left, "top": rect.top, "width": w, "height": h},
+        }
     except Exception:
         return None
 
@@ -200,12 +204,15 @@ def cua_ocr_text(window_handle: int = 0, image_path: str = "") -> str:
     """Run OCR on a window screenshot. Returns text."""
     try:
         import pytesseract
+
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         if image_path and os.path.exists(image_path):
             from PIL import Image
+
             return pytesseract.image_to_string(Image.open(image_path))
         if window_handle:
             from PIL import Image
+
             capture = cua_screenshot(window_handle, f"{image_path or 'capture'}.png")
             if capture and os.path.exists(capture):
                 return pytesseract.image_to_string(Image.open(capture))
@@ -218,6 +225,7 @@ def cua_click(window_handle: int, x: int, y: int):
     """Click at (x,y) relative to window."""
     try:
         import pywinauto.mouse
+
         pywinauto.mouse.click(button="left", coords=(x, y))
     except Exception as e:
         log(f"Click at ({x}, {y}) failed: {e}")
@@ -227,9 +235,11 @@ def _release_mouse():
     """Release all mouse buttons — call after any clicking to prevent stuck input."""
     try:
         import ctypes
-        MOUSEEVENTF_LEFTUP = 0x0004
-        MOUSEEVENTF_RIGHTUP = 0x0010
-        MOUSEEVENTF_MIDDLEUP = 0x0040
+
+        # Win32 MOUSEEVENTF_* names, kept verbatim to match the API docs.
+        MOUSEEVENTF_LEFTUP = 0x0004  # noqa: N806
+        MOUSEEVENTF_RIGHTUP = 0x0010  # noqa: N806
+        MOUSEEVENTF_MIDDLEUP = 0x0040  # noqa: N806
         for flag in (MOUSEEVENTF_LEFTUP, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_MIDDLEUP):
             ctypes.windll.user32.mouse_event(flag, 0, 0, 0, 0)
     except Exception as e:
@@ -239,18 +249,18 @@ def _release_mouse():
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
-class PhaseFailed(Exception):
+class PhaseFailedError(Exception):
     """Non-fatal phase failure — script continues to uninstall."""
 
 
-def fatal(msg: str):
+def fatal(msg: str) -> NoReturn:
     print(f"  [cua] FATAL: {msg}", flush=True)
     sys.exit(1)
 
 
 def phase_fail(msg: str):
     print(f"  [cua] PHASE FAIL: {msg}", flush=True)
-    raise PhaseFailed(msg)
+    raise PhaseFailedError(msg)
 
 
 # ── Phase 1: Kill stale ───────────────────────────────────────────────
@@ -271,7 +281,8 @@ def find_installer() -> str:
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     pattern = os.path.join(repo_root, *NSIS_GLOB.replace("/", "\\").split("\\"))
-    matches = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
+    # pattern is absolute (repo_root joined); Path.glob rejects absolute patterns.
+    matches = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)  # noqa: PTH207
     if matches:
         return matches[0]
     fatal("No NSIS installer found. Run 'just build-native' first.")
@@ -305,7 +316,7 @@ def launch_app():
     log(f"Launched {exe}")
     for attempt in range(MAX_RETRY):
         try:
-            resp = urllib.request.urlopen(f"{BACKEND_URL}{HEALTH_PATH}", timeout=5)
+            resp = urllib.request.urlopen(f"{BACKEND_URL}{HEALTH_PATH}", timeout=5)  # noqa: S310 - localhost
             if resp.status == 200:
                 log(f"Backend healthy (attempt {attempt + 1})")
                 return
@@ -338,7 +349,7 @@ def verify_window():
 
 
 def take_screenshot(output_dir: str):
-    os.makedirs(output_dir, exist_ok=True)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     path = os.path.join(output_dir, f"cua-smoke-{int(time.time())}.png")
     result = cua_screenshot(0, path)
     if result and os.path.exists(result):
@@ -352,7 +363,7 @@ def take_screenshot(output_dir: str):
 
 def check_feature_route():
     try:
-        resp = urllib.request.urlopen(f"{BACKEND_URL}{FEATURE_PATH}", timeout=5)
+        resp = urllib.request.urlopen(f"{BACKEND_URL}{FEATURE_PATH}", timeout=5)  # noqa: S310 - localhost
         body = json.loads(resp.read())
         log(f"Feature route {FEATURE_PATH}: HTTP {resp.status}")
         if resp.status == 200:
@@ -366,7 +377,7 @@ def check_feature_route():
 
 def check_diagnostics():
     try:
-        resp = urllib.request.urlopen(f"{BACKEND_URL}{DIAGNOSTICS_PATH}", timeout=5)
+        resp = urllib.request.urlopen(f"{BACKEND_URL}{DIAGNOSTICS_PATH}", timeout=5)  # noqa: S310 - localhost
         data = json.loads(resp.read())
         if data.get("success"):
             d = data["data"]
@@ -391,7 +402,7 @@ def verify_webview_bridge(output_dir: str):
     if not cua_available():
         log("CUA client unavailable -- WebView bridge check skipped")
         return
-    os.makedirs(output_dir, exist_ok=True)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     snap_path = os.path.join(output_dir, f"bridge-snap-{int(time.time())}.png")
     result = cua_screenshot(0, snap_path)
     text = cua_ocr_text(0, snap_path or "")
@@ -400,7 +411,7 @@ def verify_webview_bridge(output_dir: str):
     if BRIDGE_OK_TEXT.lower() in text.lower() or "connected" in text.lower():
         log(f"WebView bridge OK (found '{BRIDGE_OK_TEXT}' in screenshot OCR)")
     elif text:
-        os.makedirs(output_dir, exist_ok=True)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         log(f"WebView OCR text: {text[:200]}")
         phase_fail(f"WebView bridge not OK — likely API_BASE/CSP/CORS (expected '{BRIDGE_OK_TEXT}')")
     else:
@@ -431,6 +442,7 @@ def _verify_page_ocr(text: str, label: str, expected: str) -> bool:
 def _nav_click_element(win_handle: int, wx: int, wy: int, idx: int, label: str = ""):
     """Click a nav item. Tries title-based UIA matching first, then index, then coordinates."""
     import pywinauto
+
     app = pywinauto.Application(backend="uia").connect(handle=win_handle)
     w = app.window(handle=win_handle)
 
@@ -486,7 +498,10 @@ def nav_click_through(output_dir: str):
     _release_mouse()
     _show_automation_warning()
 
-    nav_routes = cfg("nav_routes", [["Dashboard", "Automation Dashboard"], ["Logging", "Logs"], ["Settings", "Settings"], ["Help", "Help"]])
+    nav_routes = cfg(
+        "nav_routes",
+        [["Dashboard", "Automation Dashboard"], ["Logging", "Logs"], ["Settings", "Settings"], ["Help", "Help"]],
+    )
     nav_routes = [(r[0], r[1]) for r in nav_routes if len(r) >= 2]
     win = cua_find_window(WINDOW_TITLE_RE)
     if not win:
@@ -501,6 +516,7 @@ def nav_click_through(output_dir: str):
     # Bring window to front and maximize (user was warned)
     try:
         import pywinauto
+
         app = pywinauto.Application(backend="uia").connect(handle=handle)
         w = app.window(handle=handle)
         w.set_focus()
@@ -516,7 +532,7 @@ def nav_click_through(output_dir: str):
             time.sleep(3)
 
             snap_path = os.path.join(snap_dir, f"nav-{label.lower()}-{int(time.time())}.png")
-            os.makedirs(snap_dir, exist_ok=True)
+            Path(snap_dir).mkdir(parents=True, exist_ok=True)
             cua_screenshot(handle, snap_path)
             text = cua_ocr_text(handle, snap_path)
 
@@ -646,7 +662,7 @@ def main():
                 fn()
                 print(f"  V {name}\n")
                 passed += 1
-            except PhaseFailed:
+            except PhaseFailedError:
                 print(f"  X {name}\n")
                 failed += 1
                 if is_fatal:

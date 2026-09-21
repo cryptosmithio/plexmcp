@@ -153,6 +153,7 @@ ignore = [
 # CLI/build/test scripts — print() to the console is the point, not a bug.
 "scripts/cua-smoke.py" = ["T201"]
 "scripts/cua-webapp-test.py" = ["T201"]
+"mcpb/verify_pack.py" = ["T201"]
 "scripts/plex_rag_sync.py" = ["T201"]
 "verify_setup.py" = ["T201"]
 "tests/fixtures/create_fixtures.py" = ["T201"]
