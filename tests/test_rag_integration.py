@@ -8,6 +8,7 @@ import pytest
 
 from plex_mcp.services.rag_ingestor import PlexIngestor
 from plex_mcp.tools.portmanteau.rag import plex_rag
+from tests.helpers import tool_payload
 
 
 @pytest.mark.integration
@@ -50,6 +51,6 @@ async def test_rag_tool_real(real_plex_service, plex_available):
     from unittest.mock import patch
 
     with patch("plex_mcp.tools.portmanteau.rag._get_plex_service", return_value=real_plex_service):
-        result = await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="status")
+        result = tool_payload(await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="status"))
         assert result["success"] is True
         assert "count" in result["data"]

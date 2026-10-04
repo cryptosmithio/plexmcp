@@ -8,13 +8,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from plex_mcp.tools.portmanteau.rag import plex_rag
+from tests.helpers import tool_payload
 
 
 @pytest.mark.asyncio
 async def test_plex_rag_status(mock_plex_service):
     """Test the 'status' operation of the plex_rag tool."""
     with patch("plex_mcp.tools.portmanteau.rag._get_plex_service", return_value=mock_plex_service):
-        result = await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="status")
+        result = tool_payload(await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="status"))
 
         assert result["success"] is True
         assert result["operation"] == "status"
@@ -33,7 +34,9 @@ async def test_plex_rag_sync(mock_plex_service):
         ) as mock_sync:
             mock_sync.return_value = 10
 
-            result = await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="sync_metadata")
+            result = tool_payload(
+                await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(operation="sync_metadata")
+            )
 
             assert result["success"] is True
             assert result["operation"] == "sync_metadata"
@@ -48,8 +51,10 @@ async def test_plex_rag_search(mock_plex_service):
         with patch("plex_mcp.services.rag_ingestor.PlexIngestor.semantic_search") as mock_search:
             mock_search.return_value = [{"content": "Result 1", "score": 0.9}]
 
-            result = await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(
-                operation="semantic_search", query="test query"
+            result = tool_payload(
+                await (plex_rag.fn if hasattr(plex_rag, "fn") else plex_rag)(
+                    operation="semantic_search", query="test query"
+                )
             )
 
             assert result["success"] is True

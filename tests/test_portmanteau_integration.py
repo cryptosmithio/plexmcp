@@ -85,9 +85,10 @@ class TestPortmanteauToolsIntegration:
             return_value=mock_plex_service,
         ):
             _fn = plex_library.fn if hasattr(plex_library, "fn") else plex_library
-            result = tool_payload(await _fn(operation="list"))
+            result = await _fn(operation="list")
 
-            assert "success" in result
-            assert result["success"] is True
-            assert "operation" in result
-            assert "data" in result
+            # list returns a text summary as content, the raw list in meta["data"],
+            # and the Prefab card as structured_content - not a success/data dict.
+            assert result.content[0].text.strip()
+            assert isinstance(result.meta["data"], list)
+            assert result.structured_content
