@@ -2,8 +2,8 @@
 
 ## Diagnose in this order
 
-1. **Plex itself** — In a browser, open your server with a token:  
-   `http://YOUR_PLEX:32400/?X-Plex-Token=YOUR_TOKEN`  
+1. **Plex itself** — In a browser, open your server with a token:
+   `http://YOUR_PLEX:32400/?X-Plex-Token=YOUR_TOKEN`
    If this fails, fix Plex URL, token, or network before debugging PlexMCP.
 2. **Environment** — `PLEX_TOKEN` and `PLEX_URL` (or `PLEX_SERVER_URL`) set in the same shell or `.env` that runs the MCP / backend.
 3. **MCP stdio** — Run `uv run plex-mcp-advanced` and watch for import errors. If RAG is optional, ignore `docs_mcp` import messages until you follow [RAG.md](RAG.md).
@@ -32,7 +32,7 @@ Faster path: [QUICKSTART.md](QUICKSTART.md).
 
 ## Connection refused
 
-- Confirm Plex Media Server is running and the URL/port are correct (default **32400**).  
+- Confirm Plex Media Server is running and the URL/port are correct (default **32400**).
 - Check firewalls and VPN/Tailscale if Plex is not on localhost.
 
 ## Startup issues (stdio / non-TTY)
@@ -41,18 +41,18 @@ Faster path: [QUICKSTART.md](QUICKSTART.md).
 
 ## Empty libraries or search
 
-- Confirm libraries exist in Plex and scans have completed.  
+- Confirm libraries exist in Plex and scans have completed.
 - Verify the token has access to that server.
 
 ## RAG / semantic search unavailable
 
-- Ensure `docs_mcp.backend.rag_core` is importable ([RAG.md](RAG.md)).  
+- Ensure `docs_mcp.backend.rag_core` is importable ([RAG.md](RAG.md)).
 - Run **`sync_metadata`** once before **`semantic_search`**.
 
 ## *arr status unreachable
 
-- Use the same base URL the browser uses to open Radarr/Sonarr/Lidarr.  
-- From Docker, the backend must reach the container (host port, LAN IP, or reverse proxy).  
+- Use the same base URL the browser uses to open Radarr/Sonarr/Lidarr.
+- From Docker, the backend must reach the container (host port, LAN IP, or reverse proxy).
 - API keys: each app → **Settings → General → Security**.
 
 ## Logging

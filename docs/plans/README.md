@@ -2,7 +2,7 @@
 
 Strategic specs for the next phase of plex-mcp development.
 
-**Operations / docs / DX todo (separate from feature specs):**  
+**Operations / docs / DX todo (separate from feature specs):**
 [`OPERATIONAL_IMPROVEMENTS.md`](OPERATIONAL_IMPROVEMENTS.md)
 
 Start with **`ROADMAP.md`** — it explains the ordering and why,
