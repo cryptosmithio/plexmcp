@@ -28,12 +28,20 @@ function Test-ClaudeRunning {
 # Function: Stop Claude Desktop
 function Stop-Claude {
     Write-Host "🛑 Stopping Claude Desktop..." -ForegroundColor Yellow
-    
+
     $process = Get-Process -Name $ClaudeProcessName -ErrorAction SilentlyContinue
     if ($null -ne $process) {
         $process | Stop-Process -Force
-        Start-Sleep -Seconds 2
-        
+        # HARDENED 2026-09-17: was a blind Start-Sleep -Seconds 2 before the single
+        # check below - poll instead so a slightly slower shutdown isn't
+        # misreported as a failure (TRAPS_AND_PITFALLS.md #36).
+        $stopWaitSec = 10
+        $stopElapsed = 0
+        while ($stopElapsed -lt $stopWaitSec -and (Test-ClaudeRunning)) {
+            Start-Sleep -Milliseconds 500
+            $stopElapsed += 0.5
+        }
+
         # Verify it stopped
         if (Test-ClaudeRunning) {
             Write-Host "❌ Failed to stop Claude Desktop" -ForegroundColor Red
@@ -43,22 +51,29 @@ function Stop-Claude {
     } else {
         Write-Host "ℹ️  Claude Desktop was not running" -ForegroundColor Gray
     }
-    
+
     return $true
 }
 
 # Function: Start Claude Desktop
 function Start-Claude {
     Write-Host "▶️  Starting Claude Desktop..." -ForegroundColor Yellow
-    
+
     if (-not (Test-Path $ClaudeExe)) {
         Write-Host "❌ Claude Desktop executable not found at: $ClaudeExe" -ForegroundColor Red
         return $false
     }
-    
+
     Start-Process $ClaudeExe
-    Start-Sleep -Seconds $WaitTime
-    
+    # HARDENED 2026-09-17: was a blind Start-Sleep -Seconds $WaitTime before the
+    # single check below - poll instead so a slightly slower startup isn't
+    # misreported as a failure (TRAPS_AND_PITFALLS.md #36).
+    $startElapsed = 0
+    while ($startElapsed -lt $WaitTime -and -not (Test-ClaudeRunning)) {
+        Start-Sleep -Milliseconds 500
+        $startElapsed += 0.5
+    }
+
     # Verify it started
     if (Test-ClaudeRunning) {
         Write-Host "✅ Claude Desktop started" -ForegroundColor Green
@@ -73,28 +88,28 @@ function Start-Claude {
 function Test-MCPConfiguration {
     Write-Host ""
     Write-Host "🔍 Checking MCP Configuration..." -ForegroundColor Yellow
-    
+
     if (-not (Test-Path $MCPConfigPath)) {
         Write-Host "❌ MCP config file not found: $MCPConfigPath" -ForegroundColor Red
         return $false
     }
-    
+
     try {
         $config = Get-Content $MCPConfigPath -Raw | ConvertFrom-Json
-        
+
         # Check for plexmcp server
         if ($config.mcpServers.PSObject.Properties.Name -contains "plex-mcp") {
             Write-Host "✅ PlexMCP server found in configuration" -ForegroundColor Green
-            
+
             $plexConfig = $config.mcpServers.'plex-mcp'
             Write-Host "   Command: $($plexConfig.command)" -ForegroundColor Gray
             Write-Host "   Args: $($plexConfig.args -join ' ')" -ForegroundColor Gray
-            
+
             # Check environment variables
             if ($plexConfig.env) {
                 Write-Host "   Environment variables configured: $($plexConfig.env.PSObject.Properties.Name.Count)" -ForegroundColor Gray
             }
-            
+
             return $true
         } else {
             Write-Host "❌ PlexMCP server not found in configuration" -ForegroundColor Red
@@ -111,26 +126,26 @@ function Test-MCPConfiguration {
 function Test-MCPLogs {
     Write-Host ""
     Write-Host "📋 Checking Claude Desktop logs..." -ForegroundColor Yellow
-    
+
     if (-not (Test-Path $LogPath)) {
         Write-Host "⚠️  Log directory not found: $LogPath" -ForegroundColor Yellow
         return $true  # Not critical
     }
-    
+
     # Get most recent log file
     $latestLog = Get-ChildItem -Path $LogPath -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    
+
     if ($null -eq $latestLog) {
         Write-Host "⚠️  No log files found" -ForegroundColor Yellow
         return $true
     }
-    
+
     Write-Host "   Latest log: $($latestLog.Name)" -ForegroundColor Gray
-    
+
     # Check for PlexMCP-related errors in last 50 lines
     $recentLines = Get-Content $latestLog.FullName -Tail 50
     $plexLines = $recentLines | Where-Object { $_ -match "plex" -or $_ -match "PlexMCP" }
-    
+
     if ($plexLines) {
         Write-Host ""
         Write-Host "   Recent PlexMCP log entries:" -ForegroundColor Cyan
@@ -146,7 +161,7 @@ function Test-MCPLogs {
     } else {
         Write-Host "   No PlexMCP-specific entries found in recent logs" -ForegroundColor Gray
     }
-    
+
     return $true
 }
 
@@ -154,7 +169,7 @@ function Test-MCPLogs {
 function Test-PlexMCPServer {
     Write-Host ""
     Write-Host "🧪 Testing PlexMCP server directly..." -ForegroundColor Yellow
-    
+
     # Try to import and check basic structure
     $pythonCmd = "python"
     $testScript = @"
@@ -167,7 +182,7 @@ except Exception as e:
     print(f"❌ Error importing PlexMCP: {e}")
     sys.exit(1)
 "@
-    
+
     try {
         $result = $testScript | & $pythonCmd -c - 2>&1
         Write-Host "   $result" -ForegroundColor $(if ($LASTEXITCODE -eq 0) { "Green" } else { "Red" })
@@ -191,7 +206,7 @@ if (-not $NoRestart) {
             $allPassed = $false
         }
     }
-    
+
     if ($allPassed) {
         if (-not (Start-Claude)) {
             $allPassed = $false
@@ -228,4 +243,3 @@ if ($allPassed) {
     Write-Host "⚠️  Some checks failed. Review the output above for details." -ForegroundColor Yellow
     exit 1
 }
-
