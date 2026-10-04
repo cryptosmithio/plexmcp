@@ -131,7 +131,11 @@ async def create_plex_pin():
         return {"success": False, "message": f"Could not reach plex.tv: {e}", "data": None}
 
     if resp.status_code != 201:
-        return {"success": False, "message": f"plex.tv rejected the PIN request (HTTP {resp.status_code}).", "data": None}
+        return {
+            "success": False,
+            "message": f"plex.tv rejected the PIN request (HTTP {resp.status_code}).",
+            "data": None,
+        }
 
     body = resp.json()
     pin_id = body.get("id")

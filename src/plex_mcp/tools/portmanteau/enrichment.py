@@ -89,7 +89,8 @@ async def plex_media_enrichment(
         Field(description="Type of media."),
     ] = "movie",
     rating_key: Annotated[
-        str | None, Field(description="Plex rating key, for library-item operations (enrich, get_enrichment, get_related).")
+        str | None,
+        Field(description="Plex rating key, for library-item operations (enrich, get_enrichment, get_related)."),
     ] = None,
     rating_keys: Annotated[
         list[str] | None, Field(description="Plex rating keys for bulk_enrich (max 25 per call).")
@@ -130,7 +131,9 @@ async def plex_media_enrichment(
     try:
         if operation == "enrich_item":
             if not title:
-                return ToolResult(content={"success": False, "error": "title is required", "error_code": "MISSING_TITLE"})
+                return ToolResult(
+                    content={"success": False, "error": "title is required", "error_code": "MISSING_TITLE"}
+                )
             logger.info(f"Enriching {media_type}: {title} ({year})")
             wiki = await enrich_service.fetch_wikipedia_summary(title, year, media_type)
 
@@ -159,7 +162,9 @@ async def plex_media_enrichment(
 
         if operation == "get_external_metadata":
             if not title:
-                return ToolResult(content={"success": False, "error": "title is required", "error_code": "MISSING_TITLE"})
+                return ToolResult(
+                    content={"success": False, "error": "title is required", "error_code": "MISSING_TITLE"}
+                )
             markdown = f"""
 ### External Discovery: {title}
 
@@ -227,7 +232,12 @@ async def plex_media_enrichment(
             return ToolResult(
                 content={
                     "success": True,
-                    "data": {"enriched": done, "failed": failed, "requested": len(rating_keys), "processed": len(capped)},
+                    "data": {
+                        "enriched": done,
+                        "failed": failed,
+                        "requested": len(rating_keys),
+                        "processed": len(capped),
+                    },
                     "message": (
                         f"Bulk-enriched {len(done)}/{len(capped)} item(s)."
                         + (f" {len(rating_keys) - 25} skipped (per-call cap 25)." if len(rating_keys) > 25 else "")
@@ -257,7 +267,9 @@ async def plex_media_enrichment(
 
         if operation == "search_by_theme":
             if not theme:
-                return ToolResult(content={"success": False, "error": "theme is required", "error_code": "MISSING_THEME"})
+                return ToolResult(
+                    content={"success": False, "error": "theme is required", "error_code": "MISSING_THEME"}
+                )
             hits = _search_by_theme(theme, limit=limit)
             return ToolResult(content={"success": True, "data": hits, "count": len(hits)})
 
@@ -274,7 +286,11 @@ async def plex_media_enrichment(
             return ToolResult(content={"success": True, "data": hits, "count": len(hits)})
 
         return ToolResult(
-            content={"success": False, "error": f"Unsupported operation '{operation}'", "error_code": "INVALID_OPERATION"}
+            content={
+                "success": False,
+                "error": f"Unsupported operation '{operation}'",
+                "error_code": "INVALID_OPERATION",
+            }
         )
 
     except Exception as e:

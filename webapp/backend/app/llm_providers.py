@@ -431,9 +431,10 @@ async def chat_stream(
         url = row["base_url"] + row["chat_path"]
         body = _to_anthropic(model, messages)
         body["stream"] = True
-        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client, client.stream(
-            "POST", url, json=body, headers=headers
-        ) as resp:
+        async with (
+            httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client,
+            client.stream("POST", url, json=body, headers=headers) as resp,
+        ):
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if not line.startswith("data: "):
@@ -453,9 +454,10 @@ async def chat_stream(
         url = row["base_url"] + row["chat_path"]
         body = _to_ollama_native(model, messages)
         body["stream"] = True
-        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client, client.stream(
-            "POST", url, json=body, headers=headers
-        ) as resp:
+        async with (
+            httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client,
+            client.stream("POST", url, json=body, headers=headers) as resp,
+        ):
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 text = line.strip()
@@ -472,9 +474,10 @@ async def chat_stream(
         url = row["base_url"] + row["chat_path"]
         body = _openai_body(model, messages)
         body["stream"] = True
-        async with httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client, client.stream(
-            "POST", url, json=body, headers=headers
-        ) as resp:
+        async with (
+            httpx.AsyncClient(timeout=CHAT_TIMEOUT) as client,
+            client.stream("POST", url, json=body, headers=headers) as resp,
+        ):
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 if line.startswith("data: "):

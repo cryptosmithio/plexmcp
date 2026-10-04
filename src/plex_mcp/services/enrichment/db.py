@@ -143,9 +143,7 @@ def save_enrichment(
 def load_enrichment(rating_key: str) -> dict[str, Any] | None:
     conn = get_connection()
     try:
-        row = conn.execute(
-            "SELECT * FROM media_enrichment WHERE plex_rating_key = ?", (rating_key,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM media_enrichment WHERE plex_rating_key = ?", (rating_key,)).fetchone()
         return _row_to_dict(row) if row else None
     finally:
         conn.close()

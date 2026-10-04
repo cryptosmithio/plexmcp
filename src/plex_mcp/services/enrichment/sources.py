@@ -78,7 +78,9 @@ async def fetch_tmdb_deep(title: str, year: int | None, media_type: str, api_key
     director = next((c.get("name") for c in crew if c.get("job") == "Director"), None)
     writers = [c.get("name") for c in crew if c.get("job") in ("Writer", "Screenplay") and c.get("name")]
     keywords_block = detail.get("keywords") or {}
-    keywords = [k.get("name") for k in (keywords_block.get("keywords") or keywords_block.get("results") or []) if k.get("name")]
+    keywords = [
+        k.get("name") for k in (keywords_block.get("keywords") or keywords_block.get("results") or []) if k.get("name")
+    ]
     collection = detail.get("belongs_to_collection")
     poster = detail.get("poster_path")
 
