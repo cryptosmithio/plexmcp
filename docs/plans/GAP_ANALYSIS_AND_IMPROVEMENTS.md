@@ -42,7 +42,7 @@ today: the leaked-token/CORS/data-bridge/launcher-config/mcpb-bloat items.
 | ~75% of tool docstrings missing `## Return Format` / `## Examples` (fleet standard) | Directly hurts LLM/agent callers guessing at a tool's actual output shape | Medium (mechanical, ~65 tools) |
 | 3 live `.env` files (root, `webapp/backend/`, `webapp/frontend/`) | Multiple sources of truth for secrets/config — the exact class of bug already fixed once in July and partially regressed | Small |
 | No `pyright` installed/wired into CI — the Python type gate is dev-eyeballing only | Type errors ship silently | Medium |
-| 11/117 tests failing pre-session (`ToolResult` API-contract mismatch in RAG tests, a `test_backend_health` status-string mismatch) | Some are real regressions, not flaky | Medium |
+| ~~11/117 tests failing pre-session (`ToolResult` API-contract mismatch in RAG tests, a `test_backend_health` status-string mismatch)~~ | **Fixed 2026-10-04** - all stale test expectations (not tool bugs), verified live against a real Plex server. See `CHANGELOG.md`. | Done |
 | GitHub repo is `sandraschi/plexmcp` but local folder / fleet convention is `plex-mcp` (links fixed today, repo itself not renamed) | Cosmetic but a recurring source of broken links; your call | Trivial if you say yes |
 
 ---

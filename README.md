@@ -82,7 +82,7 @@ Not currently used: Zustand, Framer Motion (webapp state is local `useState`/`us
 
 ## License & credits
 
-**MIT** — [LICENSE](LICENSE).  
+**MIT** — [LICENSE](LICENSE).
 [Plex](https://www.plex.tv/), [FastMCP](https://github.com/jlowin/fastmcp), and contributors.
 
 Fleet standards cross-link: [mcp-central-docs](https://github.com/sandraschi/mcp-central-docs) (e.g. [SOTA requirements](https://github.com/sandraschi/mcp-central-docs/blob/master/standards/SOTA_REQUIREMENTS.md)).

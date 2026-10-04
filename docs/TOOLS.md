@@ -74,4 +74,3 @@ Tools return JSON-friendly dicts with `success`, `operation`, and either `data` 
 
 
 Some playback paths depend on Plex client APIs and may return `NOT_IMPLEMENTED` or limited support for certain clients. Check tool responses and [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
-

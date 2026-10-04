@@ -14,6 +14,14 @@
 ### Changed
 - **Agentic tool results no longer send the Prefab tree to the model.** `_prefab` is stripped from the string fed back as the `tool` message: it is UI, not information, and a single `list_libraries` card measured ~22 KB - previously dumped in and truncated at 4 KB, which both wasted context and truncated the actual library data the model needed to answer.
 
+## [Unreleased] — 2026-10-04
+
+### Fixed (test suite: 13 long-standing failures cleared)
+- All 13 failing tests were stale test expectations, not tool bugs: tests subscripted `ToolResult` directly (`result["success"]`) instead of unwrapping it, and several asserted shapes the tools never had. Added `tests/helpers.py::tool_data_payload` (normalizes text-summary-plus-`meta["data"]` tools to `{success, operation, data}`) and used the existing `tool_payload` elsewhere.
+- Verified live against a real Plex server (7 live tests + 2 RAG live tests pass), which also surfaced real contract facts the old tests had wrong: `plex_media search` requires a non-empty query; ffprobe output is under `result`, not `data`; subtitle search results are under `results`; library `id` is an int.
+- `test_ffmpeg_probe_real` had been silently skipping ("no media found") because it used an empty-query search the tool rejects; it now browses a real library and genuinely probes a file.
+- **Known limitation found, not fixed:** `plex_media search` with no `library_id` on a large server (83 libraries) exceeds the 30s Plex read timeout. The live test is scoped to one library; unscoped search needs a per-library fan-out or a longer/streamed timeout.
+
 ## [Unreleased] — 2026-09-13
 
 ### Added (Deep metadata enrichment)

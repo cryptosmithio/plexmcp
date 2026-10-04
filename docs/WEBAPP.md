@@ -6,8 +6,8 @@ See also [**ARCHITECTURE.md**](ARCHITECTURE.md), [**SELF_HOSTING.md**](SELF_HOST
 
 ## Documentation
 
-- **[webapp/README.md](../webapp/README.md)** — stack, features, API overview  
-- **[webapp/SETUP.md](../webapp/SETUP.md)** — environment and startup  
+- **[webapp/README.md](../webapp/README.md)** — stack, features, API overview
+- **[webapp/SETUP.md](../webapp/SETUP.md)** — environment and startup
 
 ## Ports
 
