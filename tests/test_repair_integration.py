@@ -8,11 +8,12 @@ import shutil
 import pytest
 
 from plex_mcp.tools.portmanteau.ffmpeg_mgr import plex_ffmpeg_mgr
+from tests.helpers import tool_payload
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_ffmpeg_probe_real(real_plex_service, plex_available):
+async def test_ffmpeg_probe_real(real_plex_service, plex_available, test_library_id):
     """Test probing a real media item."""
     if not shutil.which("ffprobe"):
         pytest.skip("ffprobe not found on system path.")
@@ -23,18 +24,22 @@ async def test_ffmpeg_probe_real(real_plex_service, plex_available):
     from plex_mcp.tools.portmanteau.media import plex_media
 
     with patch("plex_mcp.tools.portmanteau.media._get_plex_service", return_value=real_plex_service):
-        search_res = await (plex_media.fn if hasattr(plex_media, "fn") else plex_media)(
-            operation="search", query="", limit=1
+        browse_res = await (plex_media.fn if hasattr(plex_media, "fn") else plex_media)(
+            operation="browse", library_id=test_library_id, limit=1
         )
-        if not search_res["success"] or not search_res["data"]:
+        # browse returns a text summary as content; the raw items live in meta["data"]
+        items = (browse_res.meta or {}).get("data") or []
+        if not items:
             pytest.skip("No media found on real server to probe.")
 
-        media_key = search_res["data"][0].get("id") or search_res["data"][0].get("key")
+        media_key = items[0].get("id") or items[0].get("key")
 
     # 2. Probe it
     with patch("plex_mcp.tools.portmanteau.ffmpeg_mgr._get_plex_service", return_value=real_plex_service):
-        result = await (plex_ffmpeg_mgr.fn if hasattr(plex_ffmpeg_mgr, "fn") else plex_ffmpeg_mgr)(
-            operation="probe", media_key=media_key
+        result = tool_payload(
+            await (plex_ffmpeg_mgr.fn if hasattr(plex_ffmpeg_mgr, "fn") else plex_ffmpeg_mgr)(
+                operation="probe", media_key=media_key
+            )
         )
 
         # If it fails due to network/path issues, skip or assert
@@ -42,5 +47,4 @@ async def test_ffmpeg_probe_real(real_plex_service, plex_available):
             pytest.skip(f"Probe failed (likely path issue): {result.get('error')}")
 
         assert result["success"] is True
-        assert "data" in result
-        assert "format" in result["data"]
+        assert "format" in result["result"]

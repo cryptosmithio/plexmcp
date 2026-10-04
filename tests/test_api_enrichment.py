@@ -96,7 +96,9 @@ async def test_bulk_enrich_explicit_rating_keys_completes(webapp_app):
     with (
         patch(
             "webapp.backend.app.api.enrichment.mcp_client.call_tool",
-            AsyncMock(side_effect=lambda _name, args: _plex_details(args["media_key"], f"Title {args['media_key']}", 2000)),
+            AsyncMock(
+                side_effect=lambda _name, args: _plex_details(args["media_key"], f"Title {args['media_key']}", 2000)
+            ),
         ),
         patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", AsyncMock(return_value=None)),
         patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)),

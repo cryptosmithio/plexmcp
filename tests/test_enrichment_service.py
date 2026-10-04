@@ -53,12 +53,30 @@ def test_has_fresh_enrichment_false_for_unknown_key():
 
 def test_upsert_bumps_version():
     db.save_enrichment(
-        "1", media_type="movie", title="Heat", year=1995, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=[], director=None, tmdb_collection_id=None,
+        "1",
+        media_type="movie",
+        title="Heat",
+        year=1995,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=[],
+        director=None,
+        tmdb_collection_id=None,
     )
     db.save_enrichment(
-        "1", media_type="movie", title="Heat", year=1995, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=[], director=None, tmdb_collection_id=None,
+        "1",
+        media_type="movie",
+        title="Heat",
+        year=1995,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=[],
+        director=None,
+        tmdb_collection_id=None,
     )
     loaded = db.load_enrichment("1")
     assert loaded["enrichment_version"] == 2
@@ -66,8 +84,16 @@ def test_upsert_bumps_version():
 
 def test_search_by_theme_and_director():
     db.save_enrichment(
-        "1", media_type="movie", title="Heat", year=1995, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=["heist", "existential"], director="Michael Mann",
+        "1",
+        media_type="movie",
+        title="Heat",
+        year=1995,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=["heist", "existential"],
+        director="Michael Mann",
         tmdb_collection_id=None,
     )
     assert [r["title"] for r in db.search_by_theme("heist")] == ["Heat"]
@@ -81,49 +107,94 @@ def test_search_by_theme_and_director():
 
 def test_crossref_director_match():
     db.save_enrichment(
-        "1", media_type="movie", title="Heat", year=1995, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={"tmdb": {"cast": []}}, themes=[], director="Michael Mann",
+        "1",
+        media_type="movie",
+        title="Heat",
+        year=1995,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={"tmdb": {"cast": []}},
+        themes=[],
+        director="Michael Mann",
         tmdb_collection_id=None,
     )
     db.save_enrichment(
-        "2", media_type="movie", title="Collateral", year=2004, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={"tmdb": {"cast": []}}, themes=[], director="Michael Mann",
+        "2",
+        media_type="movie",
+        title="Collateral",
+        year=2004,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={"tmdb": {"cast": []}},
+        themes=[],
+        director="Michael Mann",
         tmdb_collection_id=None,
     )
-    refs = crossref.extract_cross_references(
-        "1", director="Michael Mann", cast=[], themes=[], collection_id=None
-    )
+    refs = crossref.extract_cross_references("1", director="Michael Mann", cast=[], themes=[], collection_id=None)
     assert any(r["target_rating_key"] == "2" and r["relation_type"] == "director" for r in refs)
 
 
 def test_crossref_thematic_needs_two_shared_tags():
     db.save_enrichment(
-        "1", media_type="movie", title="A", year=2000, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=["heist", "noir"], director=None, tmdb_collection_id=None,
+        "1",
+        media_type="movie",
+        title="A",
+        year=2000,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=["heist", "noir"],
+        director=None,
+        tmdb_collection_id=None,
     )
     db.save_enrichment(
-        "2", media_type="movie", title="B", year=2001, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=["heist"], director=None, tmdb_collection_id=None,
+        "2",
+        media_type="movie",
+        title="B",
+        year=2001,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=["heist"],
+        director=None,
+        tmdb_collection_id=None,
     )
-    refs = crossref.extract_cross_references(
-        "1", director=None, cast=[], themes=["heist", "noir"], collection_id=None
-    )
+    refs = crossref.extract_cross_references("1", director=None, cast=[], themes=["heist", "noir"], collection_id=None)
     assert refs == []  # only 1 shared tag ("heist") - below the >=2 threshold
 
     db.save_enrichment(
-        "3", media_type="movie", title="C", year=2002, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={}, themes=["heist", "noir"], director=None, tmdb_collection_id=None,
+        "3",
+        media_type="movie",
+        title="C",
+        year=2002,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={},
+        themes=["heist", "noir"],
+        director=None,
+        tmdb_collection_id=None,
     )
-    refs2 = crossref.extract_cross_references(
-        "1", director=None, cast=[], themes=["heist", "noir"], collection_id=None
-    )
+    refs2 = crossref.extract_cross_references("1", director=None, cast=[], themes=["heist", "noir"], collection_id=None)
     assert any(r["target_rating_key"] == "3" and r["relation_type"] == "thematic" for r in refs2)
 
 
 def test_crossref_shared_cast():
     db.save_enrichment(
-        "1", media_type="movie", title="A", year=2000, report_sections={}, sources_fetched=[],
-        sources_failed=[], raw_data={"tmdb": {"cast": [{"name": "Al Pacino"}]}}, themes=[], director=None,
+        "1",
+        media_type="movie",
+        title="A",
+        year=2000,
+        report_sections={},
+        sources_fetched=[],
+        sources_failed=[],
+        raw_data={"tmdb": {"cast": [{"name": "Al Pacino"}]}},
+        themes=[],
+        director=None,
         tmdb_collection_id=None,
     )
     refs = crossref.extract_cross_references(
@@ -173,9 +244,11 @@ async def test_enrich_media_item_uses_cache_on_second_call():
     async def fake_sample(system_prompt, user_prompt):
         return json.dumps({"synopsis": "S", "thematic_tags": ["x", "y"]})
 
-    with patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", AsyncMock(return_value=None)), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)):
+    with (
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", AsyncMock(return_value=None)),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)),
+    ):
         report1 = await orchestrator.enrich_media_item(
             "1", title="Heat", year=1995, media_type="movie", sample_fn=fake_sample
         )
@@ -204,9 +277,11 @@ async def test_enrich_media_item_empty_sources_list_means_no_sources():
         called["jw"] = True
         return
 
-    with patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", _wiki), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", _tmdb), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", _jw):
+    with (
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", _wiki),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", _tmdb),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", _jw),
+    ):
         await orchestrator.enrich_media_item("1", title="Heat", year=1995, media_type="movie", sources=[])
 
     assert called == {"wiki": False, "tmdb": False, "jw": False}
@@ -217,9 +292,11 @@ async def test_enrich_media_item_no_sample_fn_falls_back_gracefully():
     async def _wiki(*a, **k):
         return {"summary": "A ballet.", "url": "https://en.wikipedia.org/wiki/X"}
 
-    with patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", _wiki), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)):
+    with (
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", _wiki),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)),
+    ):
         report = await orchestrator.enrich_media_item(
             "1", title="Nutcracker", year=1977, media_type="movie", sources=["wikipedia"], sample_fn=None
         )
@@ -232,9 +309,11 @@ async def test_enrich_media_item_synthesis_failure_falls_back_not_raises():
     async def _boom(system_prompt, user_prompt):
         raise RuntimeError("LLM unreachable")
 
-    with patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", AsyncMock(return_value={"summary": "S"})), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)), \
-         patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)):
+    with (
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_wikipedia", AsyncMock(return_value={"summary": "S"})),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_tmdb_deep", AsyncMock(return_value=None)),
+        patch("plex_mcp.services.enrichment.orchestrator.fetch_justwatch", AsyncMock(return_value=None)),
+    ):
         report = await orchestrator.enrich_media_item(
             "1", title="X", year=None, media_type="movie", sources=["wikipedia"], sample_fn=_boom
         )
